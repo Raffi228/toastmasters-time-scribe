@@ -1,0 +1,333 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Play, Pause, RotateCcw, Volume2, Settings } from 'lucide-react';
+import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
+
+interface AdvancedTimerProps {
+  agendaItem: {
+    id: string;
+    title: string;
+    duration: number;
+    type: 'speech' | 'evaluation' | 'table-topics' | 'break';
+    speaker?: string;
+  };
+  onComplete: (data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => void;
+  onClose: () => void;
+}
+
+const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, onClose }) => {
+  const [timeRemaining, setTimeRemaining] = useState(agendaItem.duration);
+  const [isRunning, setIsRunning] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [showCustomRules, setShowCustomRules] = useState(false);
+  const [selectedType, setSelectedType] = useState<AgendaType>(() => 
+    getTypeFromTitle(agendaItem.title, agendaItem.duration)
+  );
+  const [customRules, setCustomRules] = useState<TimerRules>(() => 
+    PRESET_RULES[getTypeFromTitle(agendaItem.title, agendaItem.duration)]
+  );
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const pausedTimeRef = useRef<number>(0);
+
+  // 初始化音频上下文
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.log('Audio context not available');
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  // 计时器逻辑
+  useEffect(() => {
+    if (isRunning) {
+      intervalRef.current = setInterval(() => {
+        setTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning]);
+
+  // 获取当前计时规则
+  const getCurrentRules = (): TimerRules => {
+    if (showCustomRules) {
+      return customRules;
+    }
+    return PRESET_RULES[selectedType];
+  };
+
+  // 获取当前阶段
+  const getCurrentPhase = () => {
+    const rules = getCurrentRules();
+    
+    if (timeRemaining <= (rules.white || -30)) return 'white';
+    if (timeRemaining <= (rules.red || 0)) return 'red';
+    if (timeRemaining <= rules.yellow) return 'yellow';
+    if (timeRemaining <= rules.green) return 'green';
+    return 'normal';
+  };
+
+  // 播放提示音
+  const playSound = (frequency: number, duration: number = 0.5, volume: number = 0.3) => {
+    if (!audioContextRef.current) return;
+    
+    try {
+      const oscillator = audioContextRef.current.createOscillator();
+      const gainNode = audioContextRef.current.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+      
+      oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime);
+      gainNode.gain.setValueAtTime(volume, audioContextRef.current.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + duration);
+      
+      oscillator.start(audioContextRef.current.currentTime);
+      oscillator.stop(audioContextRef.current.currentTime + duration);
+    } catch (error) {
+      console.log('Audio playback failed');
+    }
+  };
+
+  // 阶段变化时播放提示音
+  useEffect(() => {
+    const rules = getCurrentRules();
+    const phase = getCurrentPhase();
+    
+    if (timeRemaining === rules.green) {
+      playSound(800, 0.5); // 绿牌提示音
+    } else if (timeRemaining === rules.yellow) {
+      playSound(1000, 0.8); // 黄牌警示音
+    } else if (timeRemaining === (rules.red || 0)) {
+      playSound(1200, 1.0, 0.5); // 红牌警示音
+    } else if (phase === 'white') {
+      playSound(1500, 0.3, 0.6); // 白牌强烈警示音
+    }
+  }, [timeRemaining]);
+
+  const formatTime = (seconds: number) => {
+    const isNegative = seconds < 0;
+    const absSeconds = Math.abs(seconds);
+    const mins = Math.floor(absSeconds / 60);
+    const secs = absSeconds % 60;
+    return `${isNegative ? '-' : ''}${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleStart = () => {
+    setIsRunning(true);
+    setHasStarted(true);
+    startTimeRef.current = Date.now() - pausedTimeRef.current;
+  };
+
+  const handlePause = () => {
+    setIsRunning(false);
+    pausedTimeRef.current = Date.now() - startTimeRef.current;
+  };
+
+  const handleReset = () => {
+    setIsRunning(false);
+    setTimeRemaining(agendaItem.duration);
+    startTimeRef.current = 0;
+    pausedTimeRef.current = 0;
+  };
+
+  const handleStop = () => {
+    setIsRunning(false);
+    const actualDuration = agendaItem.duration - timeRemaining;
+    const isOvertime = timeRemaining < 0;
+    const overtimeAmount = Math.abs(Math.min(0, timeRemaining));
+    
+    onComplete({
+      actualDuration,
+      isOvertime,
+      overtimeAmount
+    });
+  };
+
+  const handleTypeChange = (type: AgendaType) => {
+    setSelectedType(type);
+    if (!showCustomRules) {
+      setCustomRules(PRESET_RULES[type]);
+    }
+  };
+
+  const phase = getCurrentPhase();
+  const rules = getCurrentRules();
+
+  // 获取背景颜色
+  const getBackgroundColor = () => {
+    switch (phase) {
+      case 'white': return 'bg-red-600 animate-pulse';
+      case 'red': return 'bg-red-500';
+      case 'yellow': return 'bg-yellow-500';
+      case 'green': return 'bg-green-500';
+      default: return 'bg-white';
+    }
+  };
+
+  // 获取文字颜色
+  const getTextColor = () => {
+    return phase === 'normal' ? 'text-gray-900' : 'text-white';
+  };
+
+  const getPhaseText = () => {
+    switch (phase) {
+      case 'white': return '白牌 - 强制停止';
+      case 'red': return '红牌 - 时间到';
+      case 'yellow': return '黄牌 - 准备结束';
+      case 'green': return '绿牌 - 时间充足';
+      default: return '正常计时';
+    }
+  };
+
+  return (
+    <Card className={`mb-4 border-2 ${getBackgroundColor()} transition-all duration-300`}>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className={`font-semibold ${getTextColor()}`}>{agendaItem.title}</h3>
+            <p className={`text-sm ${getTextColor()} opacity-80`}>
+              总时长: {formatTime(agendaItem.duration)} | 演讲者: {agendaItem.speaker || '未指定'}
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
+            ×
+          </Button>
+        </div>
+
+        {/* 倒计时显示 */}
+        <div className="text-center mb-6">
+          <div className={`text-6xl font-mono font-bold mb-2 ${getTextColor()}`}>
+            {formatTime(timeRemaining)}
+          </div>
+          <Badge className={`text-lg px-4 py-2 ${
+            phase === 'white' ? 'bg-white text-black border-2 border-black' :
+            phase === 'red' ? 'bg-red-600 text-white' :
+            phase === 'yellow' ? 'bg-yellow-600 text-white' :
+            phase === 'green' ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'
+          }`}>
+            <Volume2 className="h-4 w-4 mr-2" />
+            {getPhaseText()}
+          </Badge>
+        </div>
+
+        {/* 控制按钮 */}
+        <div className="flex justify-center space-x-3 mb-6">
+          {!isRunning && (
+            <Button onClick={handleStart} className="bg-green-600 hover:bg-green-700">
+              <Play className="h-4 w-4 mr-2" />
+              {hasStarted ? '继续' : '开始'}
+            </Button>
+          )}
+          
+          {isRunning && (
+            <>
+              <Button onClick={handlePause} variant="outline">
+                <Pause className="h-4 w-4 mr-2" />
+                暂停
+              </Button>
+              <Button onClick={handleStop} variant="destructive">
+                结束计时
+              </Button>
+            </>
+          )}
+          
+          <Button onClick={handleReset} variant="outline">
+            <RotateCcw className="h-4 w-4 mr-2" />
+            重置
+          </Button>
+        </div>
+
+        {/* 规则配置 */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <Label className={getTextColor()}>计时规则配置</Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCustomRules(!showCustomRules)}
+              className={getTextColor()}
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              {showCustomRules ? '使用预设' : '自定义'}
+            </Button>
+          </div>
+
+          {!showCustomRules ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className={getTextColor()}>环节类型</Label>
+                <Select value={selectedType} onValueChange={handleTypeChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="speech">备稿演讲</SelectItem>
+                    <SelectItem value="longEval">长评估</SelectItem>
+                    <SelectItem value="shortEval">即兴/短评估</SelectItem>
+                    <SelectItem value="shareHost">分享/主持</SelectItem>
+                    <SelectItem value="other">其他环节</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className={`${getTextColor()} opacity-80`}>规则预览:</div>
+                <div className={`${getTextColor()} opacity-70`}>绿牌: 剩余 {formatTime(rules.green)}</div>
+                <div className={`${getTextColor()} opacity-70`}>黄牌: 剩余 {formatTime(rules.yellow)}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className={getTextColor()}>绿牌剩余时间(秒)</Label>
+                <Input
+                  type="number"
+                  value={customRules.green}
+                  onChange={(e) => setCustomRules(prev => ({ ...prev, green: parseInt(e.target.value) || 0 }))}
+                  className="bg-white/20 border-white/30"
+                />
+              </div>
+              <div>
+                <Label className={getTextColor()}>黄牌剩余时间(秒)</Label>
+                <Input
+                  type="number"
+                  value={customRules.yellow}
+                  onChange={(e) => setCustomRules(prev => ({ ...prev, yellow: parseInt(e.target.value) || 0 }))}
+                  className="bg-white/20 border-white/30"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default AdvancedTimer;

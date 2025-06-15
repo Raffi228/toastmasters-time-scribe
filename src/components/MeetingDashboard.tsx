@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Clock, Play, FileText, Download, Upload } from 'lucide-react';
-import InlineTimer from '@/components/InlineTimer';
+import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
 import TimerReport from '@/components/reports/TimerReport';
@@ -170,7 +170,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             <div className="flex space-x-2">
               <Button onClick={() => setIsImportDialogOpen(true)} variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                导入议程
+                智能导入议程
               </Button>
               <Button onClick={exportReport} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
@@ -186,13 +186,13 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Agenda List */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Active Timers */}
+            {/* Active Advanced Timers */}
             {Array.from(activeTimers).map(timerId => {
               const agendaItem = meetingData.agenda.find(item => item.id === timerId);
               if (!agendaItem) return null;
               
               return (
-                <InlineTimer
+                <AdvancedTimer
                   key={timerId}
                   agendaItem={agendaItem}
                   onComplete={(data) => handleTimerComplete(timerId, data)}
@@ -258,7 +258,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             disabled={activeTimers.has(item.id)}
                           >
                             <Play className="h-3 w-3 mr-1" />
-                            {activeTimers.has(item.id) ? '计时中' : '计时'}
+                            {activeTimers.has(item.id) ? '计时中' : '智能计时'}
                           </Button>
                           <Button
                             size="sm"
@@ -362,7 +362,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                 <div className="space-y-3">
                   <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                     <Upload className="h-4 w-4 mr-2" />
-                    批量导入议程
+                    智能导入议程
                   </Button>
                   <Button className="w-full" variant="outline" onClick={exportReport}>
                     <Download className="h-4 w-4 mr-2" />
