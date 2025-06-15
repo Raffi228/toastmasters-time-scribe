@@ -245,14 +245,18 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
     }
   };
 
-  const exampleText = `时间	项目	时长	姓名	教育头衔
-19:05	暖场环节	8'	Sherry.Zhang（自律嘉宾）	
-19:15	会议开场	1'	Sophy(聚联)	LD1
-19:33	AI与工作--AI画图进化史	5-7'	许闻怡（聚联）	DTM
-19：41	即兴主题《TikTok Refugee》	25'	胡茶（聚联）	EC3
-20:08	备稿1：《技术出海新篇章》	5-7'	Janson(聚联）	PM4
-20:43	即兴评估	5-7'	Weiping（聚联）	DTM
-20:51	个体评估1	2-3'	佳霖（自律）	PM2`;
+  const exampleText = `时间	项目	时长	姓名	等级
+19:00	开场致辞	3'	张主席	DTM
+19:05	暖场环节	8'	李小明	CC
+19:15	会议介绍	2'	王主持	CL
+19:20	备稿演讲：《科技改变生活》	5-7'	陈演讲者	CC
+19:28	即兴演讲环节	20'	刘主持人	ACB
+19:50	备稿演讲：《团队协作的力量》	5-7'	赵发言人	CC
+19:58	个体评估1	2-3'	孙评估员	ACB
+20:02	个体评估2	2-3'	周点评人	CC
+20:08	即兴评估	5-7'	吴评估师	DTM
+20:16	语法官报告	2'	郑语法官	CL
+20:19	总评报告	3'	何总评官	DTM`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
