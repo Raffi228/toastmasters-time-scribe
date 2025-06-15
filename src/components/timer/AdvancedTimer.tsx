@@ -18,6 +18,7 @@ interface AdvancedTimerProps {
   };
   onComplete: (data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => void;
   onClose: () => void;
+  onUpdate?: (updatedItem: { id: string; title: string; duration: number; speaker?: string }) => void;
 }
 
 interface PersonalTimer {
@@ -27,7 +28,9 @@ interface PersonalTimer {
   isRunning: boolean;
 }
 
-const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, onClose }) => {
+const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, onClose, onUpdate }) => {
+  const [currentTitle, setCurrentTitle] = useState(agendaItem.title);
+  const [currentSpeaker, setCurrentSpeaker] = useState(agendaItem.speaker || '');
   const [timeRemaining, setTimeRemaining] = useState(agendaItem.duration);
   const [originalDuration, setOriginalDuration] = useState(agendaItem.duration);
   const [isRunning, setIsRunning] = useState(false);
@@ -48,8 +51,10 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   // 编辑状态
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [isEditingSpeaker, setIsEditingSpeaker] = useState(false);
   const [editTitle, setEditTitle] = useState(agendaItem.title);
   const [editDuration, setEditDuration] = useState(Math.round(agendaItem.duration / 60));
+  const [editSpeaker, setEditSpeaker] = useState(agendaItem.speaker || '');
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const personalIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -225,8 +230,18 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   };
 
   const handleTitleEdit = () => {
+    setCurrentTitle(editTitle);
     setIsEditingTitle(false);
-    // 可以在这里添加保存逻辑
+    
+    // 通知父组件更新
+    if (onUpdate) {
+      onUpdate({
+        id: agendaItem.id,
+        title: editTitle,
+        duration: originalDuration,
+        speaker: currentSpeaker
+      });
+    }
   };
 
   const handleDurationEdit = () => {
@@ -236,6 +251,31 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
       setTimeRemaining(newDuration);
     }
     setIsEditingDuration(false);
+    
+    // 通知父组件更新
+    if (onUpdate) {
+      onUpdate({
+        id: agendaItem.id,
+        title: currentTitle,
+        duration: newDuration,
+        speaker: currentSpeaker
+      });
+    }
+  };
+
+  const handleSpeakerEdit = () => {
+    setCurrentSpeaker(editSpeaker);
+    setIsEditingSpeaker(false);
+    
+    // 通知父组件更新
+    if (onUpdate) {
+      onUpdate({
+        id: agendaItem.id,
+        title: currentTitle,
+        duration: originalDuration,
+        speaker: editSpeaker
+      });
+    }
   };
 
   // 个人计时器管理
@@ -333,7 +373,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
                 className={`font-semibold ${getTextColor()} cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-2`}
                 onClick={() => setIsEditingTitle(true)}
               >
-                {agendaItem.title}
+                {currentTitle}
                 <Edit2 className="h-3 w-3 opacity-50" />
               </div>
             )}
@@ -366,9 +406,30 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
                 </div>
               )}
               
-              <div className={`text-sm ${getTextColor()} opacity-80`}>
-                演讲者: {agendaItem.speaker || '未指定'}
-              </div>
+              {isEditingSpeaker ? (
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm ${getTextColor()} opacity-80`}>演讲者:</span>
+                  <Input
+                    value={editSpeaker}
+                    onChange={(e) => setEditSpeaker(e.target.value)}
+                    className="w-24 h-6 text-xs bg-white/20 border-white/30"
+                    onBlur={handleSpeakerEdit}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSpeakerEdit()}
+                    autoFocus
+                  />
+                  <Button size="sm" variant="ghost" onClick={handleSpeakerEdit} className={getTextColor()}>
+                    <Check className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div 
+                  className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
+                  onClick={() => setIsEditingSpeaker(true)}
+                >
+                  演讲者: {currentSpeaker || '未指定'}
+                  <Edit2 className="h-3 w-3 opacity-50" />
+                </div>
+              )}
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
