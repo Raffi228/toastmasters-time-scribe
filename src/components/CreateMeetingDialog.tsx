@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Upload, GripVertical, Trash } from 'lucide-react';
+import { Plus, Trash2, Upload, GripVertical, Edit2, Check, X } from 'lucide-react';
 import ImportAgendaDialog from './ImportAgendaDialog';
 
 interface AgendaItem {
@@ -39,6 +39,8 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<AgendaItem>>({});
 
   const agendaTemplates = {
     speech: { title: '备稿演讲', duration: 420, type: 'speech' as const },
@@ -58,16 +60,30 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
 
   const removeAgendaItem = (id: string) => {
     setAgenda(agenda.filter(item => item.id !== id));
+    if (editingItem === id) {
+      setEditingItem(null);
+      setEditForm({});
+    }
   };
 
-  const clearAllAgenda = () => {
-    setAgenda([]);
+  const startEditing = (item: AgendaItem) => {
+    setEditingItem(item.id);
+    setEditForm({ ...item });
   };
 
-  const updateAgendaItem = (id: string, updates: Partial<AgendaItem>) => {
-    setAgenda(agenda.map(item => 
-      item.id === id ? { ...item, ...updates } : item
-    ));
+  const cancelEditing = () => {
+    setEditingItem(null);
+    setEditForm({});
+  };
+
+  const saveEditing = () => {
+    if (editingItem && editForm) {
+      setAgenda(agenda.map(item => 
+        item.id === editingItem ? { ...item, ...editForm } : item
+      ));
+      setEditingItem(null);
+      setEditForm({});
+    }
   };
 
   const handleImport = (importedAgenda: Omit<AgendaItem, 'id'>[]) => {
@@ -126,6 +142,16 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
       return `${minutes}分钟`;
     }
     return `${minutes}分${remainingSeconds}秒`;
+  };
+
+  const getTypeDisplayName = (type: AgendaItem['type']) => {
+    const typeNames = {
+      speech: '备稿演讲',
+      evaluation: '点评环节',
+      'table-topics': '即兴演讲',
+      break: '休息时间'
+    };
+    return typeNames[type];
   };
 
   return (
@@ -215,25 +241,11 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                 </div>
               </div>
 
-              {agenda.length > 0 && (
-                <div className="flex justify-end mb-3">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={clearAllAgenda}
-                  >
-                    <Trash className="h-3 w-3 mr-1" />
-                    清空所有
-                  </Button>
-                </div>
-              )}
-
               <div className="space-y-3">
                 {agenda.map((item, index) => (
                   <Card 
                     key={item.id}
-                    className="cursor-move"
+                    className="cursor-move hover:shadow-md transition-shadow"
                     draggable
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={handleDragOver}
@@ -242,67 +254,119 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <GripVertical className="h-4 w-4 text-gray-400" />
+                          <GripVertical className="h-4 w-4 text-gray-400 cursor-grab" />
                           <CardTitle className="text-sm">议程项目 {index + 1}</CardTitle>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAgendaItem(item.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          {editingItem === item.id ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={saveEditing}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={cancelEditing}
+                                className="text-gray-600 hover:text-gray-700"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing(item)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAgendaItem(item.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div>
-                        <Label>项目标题</Label>
-                        <Input
-                          value={item.title}
-                          onChange={(e) => updateAgendaItem(item.id, { title: e.target.value })}
-                          placeholder="议程项目标题"
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>类型</Label>
-                          <Select
-                            value={item.type}
-                            onValueChange={(value) => updateAgendaItem(item.id, { type: value as AgendaItem['type'] })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="speech">备稿演讲</SelectItem>
-                              <SelectItem value="evaluation">点评环节</SelectItem>
-                              <SelectItem value="table-topics">即兴演讲</SelectItem>
-                              <SelectItem value="break">休息时间</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label>时长 ({formatDuration(item.duration)})</Label>
-                          <Input
-                            type="number"
-                            value={Math.floor(item.duration / 60)}
-                            onChange={(e) => updateAgendaItem(item.id, { duration: parseInt(e.target.value) * 60 })}
-                            placeholder="分钟"
-                          />
-                        </div>
-                      </div>
+                      {editingItem === item.id ? (
+                        // 编辑模式
+                        <>
+                          <div>
+                            <Label>项目标题</Label>
+                            <Input
+                              value={editForm.title || ''}
+                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                              placeholder="议程项目标题"
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>类型</Label>
+                              <Select
+                                value={editForm.type || item.type}
+                                onValueChange={(value) => setEditForm({ ...editForm, type: value as AgendaItem['type'] })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="speech">备稿演讲</SelectItem>
+                                  <SelectItem value="evaluation">点评环节</SelectItem>
+                                  <SelectItem value="table-topics">即兴演讲</SelectItem>
+                                  <SelectItem value="break">休息时间</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label>时长 (分钟)</Label>
+                              <Input
+                                type="number"
+                                value={Math.floor((editForm.duration || item.duration) / 60)}
+                                onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value || '0') * 60 })}
+                                placeholder="分钟"
+                              />
+                            </div>
+                          </div>
 
-                      {item.type === 'speech' && (
-                        <div>
-                          <Label>演讲者</Label>
-                          <Input
-                            value={item.speaker || ''}
-                            onChange={(e) => updateAgendaItem(item.id, { speaker: e.target.value })}
-                            placeholder="演讲者姓名"
-                          />
+                          <div>
+                            <Label>演讲者</Label>
+                            <Input
+                              value={editForm.speaker || ''}
+                              onChange={(e) => setEditForm({ ...editForm, speaker: e.target.value })}
+                              placeholder="演讲者姓名"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        // 显示模式
+                        <div className="space-y-2">
+                          <div 
+                            className="cursor-pointer hover:bg-gray-50 p-2 rounded"
+                            onClick={() => startEditing(item)}
+                          >
+                            <div className="font-medium">{item.title}</div>
+                            <div className="text-sm text-gray-600">
+                              {getTypeDisplayName(item.type)} • {formatDuration(item.duration)}
+                              {item.speaker && ` • ${item.speaker}`}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </CardContent>

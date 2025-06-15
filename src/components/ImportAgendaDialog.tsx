@@ -43,35 +43,52 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
   };
 
   const parseSingleDuration = (durationStr: string): number => {
+    console.log('Parsing duration:', durationStr);
+    
     const patterns = [
-      /(\d+)-(\d+)分钟?/,
-      /(\d+)-(\d+)'/,
-      /(\d+)分钟?/,
-      /(\d+):(\d+)/,
-      /(\d+)'/,
-      /(\d+)秒/,
-      /^(\d+)$/
+      /(\d+)-(\d+)分钟?/,        // 5-7分钟
+      /(\d+)-(\d+)'/,            // 5-7'
+      /(\d+)分钟?/,              // 8分钟
+      /(\d+)'/,                  // 8'
+      /(\d+):(\d+)/,             // 5:30
+      /(\d+)秒/,                 // 30秒
+      /^(\d+)$/                  // 纯数字
     ];
 
     for (const pattern of patterns) {
       const match = durationStr.match(pattern);
       if (match) {
+        console.log('Pattern matched:', pattern, match);
+        
         if (pattern.source.includes('-')) {
+          // 范围时长，取中间值
           const min = parseInt(match[1]);
           const max = parseInt(match[2]);
-          return Math.round((min + max) / 2) * 60;
+          const result = Math.round((min + max) / 2) * 60;
+          console.log('Range duration result:', result);
+          return result;
         } else if (pattern.source.includes(':')) {
+          // 分:秒格式
           const mins = parseInt(match[1]);
           const secs = parseInt(match[2]);
-          return mins * 60 + secs;
+          const result = mins * 60 + secs;
+          console.log('Minutes:seconds result:', result);
+          return result;
         } else if (pattern.source.includes('秒')) {
-          return parseInt(match[1]);
+          // 秒数
+          const result = parseInt(match[1]);
+          console.log('Seconds result:', result);
+          return result;
         } else {
-          return parseInt(match[1]) * 60;
+          // 分钟数（包括 8' 格式）
+          const result = parseInt(match[1]) * 60;
+          console.log('Minutes result:', result);
+          return result;
         }
       }
     }
 
+    console.log('No pattern matched, using default 180');
     return 180; // 默认3分钟
   };
 
@@ -94,7 +111,9 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
             titleLower.includes('中场') || titleLower.includes('暖场') ||
             titleLower.includes('来宾介绍') || titleLower.includes('合影') ||
             titleLower.includes('颁奖') || titleLower.includes('投票') ||
-            titleLower.includes('茶歇') || titleLower.includes('networking')) {
+            titleLower.includes('茶歇') || titleLower.includes('networking') ||
+            titleLower.includes('开场/致辞') || titleLower.includes('上半场') ||
+            titleLower.includes('下半场')) {
           return 'break';
         }
         
@@ -117,10 +136,10 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
     for (const line of lines) {
       if (!line.trim()) continue;
       
-      // 跳过表头和分割线
+      // 跳过表头和分割线以及章节标题
       if (line.includes('时间') && line.includes('项目') && line.includes('时长')) continue;
       if (line.includes('---') || line.includes('===')) continue;
-      if (line.includes('开场/致辞') || line.includes('上半场') || line.includes('下半场')) continue;
+      if (line.match(/^(开场\/致辞|上半场|下半场|会议\/三官介绍|科技微分享环节|即兴演讲环节|备稿环节|来宾发言、合影、休息|即兴&备稿评估环节|会议总体评估环节|颁奖及结束环节)$/)) continue;
 
       let parts: string[] = [];
       
@@ -182,6 +201,8 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
 
         const duration = parseDuration(durationStr);
         const type = determineType(title, duration);
+
+        console.log('Parsed item:', { title, durationStr, duration, type, speaker });
 
         agenda.push({
           title,
