@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,8 +25,24 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
   const { toast } = useToast();
 
   const parseDuration = (durationStr: string): number => {
-    const cleanStr = durationStr.replace(/\s+/g, '');
+    if (!durationStr || durationStr.trim() === '') return 180;
     
+    const cleanStr = durationStr.replace(/\s+/g, '').replace(/['']/g, '');
+    
+    // 处理多个时长的情况，如 "2'+2'+2'"
+    if (cleanStr.includes('+')) {
+      const parts = cleanStr.split('+');
+      let total = 0;
+      for (const part of parts) {
+        total += parseSingleDuration(part);
+      }
+      return total;
+    }
+    
+    return parseSingleDuration(cleanStr);
+  };
+
+  const parseSingleDuration = (durationStr: string): number => {
     const patterns = [
       /(\d+)-(\d+)分钟?/,
       /(\d+)-(\d+)'/,
@@ -37,7 +54,7 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
     ];
 
     for (const pattern of patterns) {
-      const match = cleanStr.match(pattern);
+      const match = durationStr.match(pattern);
       if (match) {
         if (pattern.source.includes('-')) {
           const min = parseInt(match[1]);
@@ -99,32 +116,68 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
 
     for (const line of lines) {
       if (!line.trim()) continue;
+      
+      // 跳过表头和分割线
+      if (line.includes('时间') && line.includes('项目') && line.includes('时长')) continue;
+      if (line.includes('---') || line.includes('===')) continue;
+      if (line.includes('开场/致辞') || line.includes('上半场') || line.includes('下半场')) continue;
 
       let parts: string[] = [];
       
+      // 优先按制表符分割（从表格复制的数据）
       if (line.includes('\t')) {
         parts = line.split(/\t+/).map(part => part.trim()).filter(part => part);
       } 
+      // 按多个空格分割
       else if (line.match(/\s{2,}/)) {
         parts = line.split(/\s{2,}/).map(part => part.trim()).filter(part => part);
       }
+      // 尝试智能解析：时间 项目 时长 姓名格式
       else {
-        const match = line.match(/^(.+?)\s+([0-9\-'分钟秒:]+)\s*(.*)$/);
+        const match = line.match(/^(\d{1,2}[:：]\d{2})\s+(.+?)\s+([0-9\-'分钟秒:+]+)\s+(.+?)(?:\s+([A-Z0-9]+))?$/);
         if (match) {
-          parts = [match[1].trim(), match[2].trim(), match[3].trim()].filter(part => part);
+          const [, time, title, duration, speaker, level] = match;
+          parts = [time, title, duration, speaker, level].filter(part => part);
         } else {
+          // 简单按空格分割作为备选
           parts = line.split(/\s+/).map(part => part.trim()).filter(part => part);
         }
       }
 
+      // 至少需要项目名称和时长
       if (parts.length >= 2) {
-        const title = parts[0];
-        const durationStr = parts[1];
+        let title = '';
+        let durationStr = '';
         let speaker = '';
         
-        if (parts.length > 2) {
-          speaker = parts.slice(2).join(' ');
+        // 根据parts数量判断格式
+        if (parts.length >= 4) {
+          // 完整格式：时间 项目 时长 姓名 [等级]
+          title = parts[1];
+          durationStr = parts[2];
+          speaker = parts[3];
+        } else if (parts.length === 3) {
+          // 可能是：项目 时长 姓名 或 时间 项目 时长
+          if (parts[0].match(/^\d{1,2}[:：]\d{2}/)) {
+            // 时间 项目 时长
+            title = parts[1];
+            durationStr = parts[2];
+          } else {
+            // 项目 时长 姓名
+            title = parts[0];
+            durationStr = parts[1];
+            speaker = parts[2];
+          }
+        } else {
+          // 项目 时长
+          title = parts[0];
+          durationStr = parts[1];
+        }
+
+        // 清理姓名中的括号和等级信息
+        if (speaker) {
           speaker = speaker.replace(/[\(\（].*?[\)\）]/g, '').trim();
+          speaker = speaker.replace(/\s+[A-Z0-9]+$/, '').trim();
         }
 
         const duration = parseDuration(durationStr);
@@ -148,7 +201,7 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
       if (parsedAgenda.length === 0) {
         toast({
           title: "导入失败",
-          description: "请确认数据格式正确。支持多种格式：议程名称 时长 演讲者",
+          description: "请确认数据格式正确。支持表格复制格式：时间 项目 时长 姓名",
           variant: "destructive"
         });
         return;
@@ -171,13 +224,14 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
     }
   };
 
-  const exampleText = `备稿演讲 - 技术出海新篇章 5-7分钟 Janson
-即兴演讲 - TikTok Refugee 25分钟 胡茶
-个体评估 - 备稿1 2-3分钟 佳霖
-长评估 - 演讲技巧分析 4-5分钟 大米
-分享环节 - 职场经验 15分钟 张三
-主持开场 1-2分钟 Sophy
-休息茶歇 10分钟`;
+  const exampleText = `时间	项目	时长	姓名	教育头衔
+19:05	暖场环节	8'	Sherry.Zhang（自律嘉宾）	
+19:15	会议开场	1'	Sophy(聚联)	LD1
+19:33	AI与工作--AI画图进化史	5-7'	许闻怡（聚联）	DTM
+19：41	即兴主题《TikTok Refugee》	25'	胡茶（聚联）	EC3
+20:08	备稿1：《技术出海新篇章》	5-7'	Janson(聚联）	PM4
+20:43	即兴评估	5-7'	Weiping（聚联）	DTM
+20:51	个体评估1	2-3'	佳霖（自律）	PM2`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -185,54 +239,41 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
         <DialogHeader>
           <DialogTitle>智能导入议程</DialogTitle>
           <DialogDescription>
-            支持多种格式导入，自动推荐计时类型和规则配置
+            支持从表格复制粘贴，自动识别时间、项目、时长、演讲者信息
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">
-              智能识别功能：
+              支持格式：
             </label>
             <div className="bg-blue-50 p-3 rounded text-xs text-blue-800">
-              • 自动识别环节类型：备稿演讲、长/短评估、即兴演讲、分享主持、其他<br/>
-              • 智能推荐计时规则：根据环节类型和时长自动匹配<br/>
-              • 支持时长范围：5-7分钟、1-2'、3:30等格式<br/>
-              • 即兴演讲支持个人计时器功能
+              • 表格复制格式：时间 → 项目 → 时长 → 姓名 → 等级<br/>
+              • 自动识别多段时长：如 "2'+2'+2'" → 6分钟<br/>
+              • 智能类型识别：备稿演讲、即兴演讲、评估、分享等<br/>
+              • 自动清理姓名中的括号和等级信息
             </div>
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">
-              类型识别规则：
+              示例数据：
             </label>
-            <div className="bg-gray-50 p-3 rounded text-xs text-gray-600">
-              • 包含"备稿"→备稿演讲<br/>
-              • 包含"即兴"、"table topics"→即兴演讲<br/>
-              • 包含"评估"且>3分钟→长评估，≤3分钟→短评估<br/>
-              • 包含"分享"、"主持"、"介绍"→分享主持<br/>
-              • 包含"休息"、"茶歇"→休息时间
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              数据格式示例：
-            </label>
-            <div className="bg-gray-50 p-3 rounded text-sm font-mono whitespace-pre">
+            <div className="bg-gray-50 p-3 rounded text-sm font-mono whitespace-pre text-xs">
               {exampleText}
             </div>
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">
-              粘贴数据：
+              粘贴议程数据：
             </label>
             <Textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder="在此粘贴议程数据..."
-              rows={8}
+              placeholder="直接从表格复制粘贴议程数据..."
+              rows={10}
               className="font-mono text-sm"
             />
           </div>
