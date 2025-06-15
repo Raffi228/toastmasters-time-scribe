@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
+import CurrentTime from '@/components/CurrentTime';
 
 interface AdvancedTimerProps {
   agendaItem: {
@@ -489,6 +490,11 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
           <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
             ×
           </Button>
+        </div>
+
+        {/* 当前时间显示 */}
+        <div className="text-center mb-4">
+          <CurrentTime />
         </div>
 
         {/* 主倒计时显示 */}
