@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
 
 interface AdvancedTimerProps {
@@ -33,7 +33,6 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [showCustomRules, setShowCustomRules] = useState(false);
-  const [showManualSettings, setShowManualSettings] = useState(false);
   const [selectedType, setSelectedType] = useState<AgendaType>(() => 
     getTypeFromTitle(agendaItem.title, agendaItem.duration)
   );
@@ -45,6 +44,12 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const [isTableTopics, setIsTableTopics] = useState(false);
   const [personalTimers, setPersonalTimers] = useState<PersonalTimer[]>([]);
   const [newPersonName, setNewPersonName] = useState('');
+  
+  // 编辑状态
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [editTitle, setEditTitle] = useState(agendaItem.title);
+  const [editDuration, setEditDuration] = useState(Math.round(agendaItem.duration / 60));
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const personalIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -219,11 +224,18 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     }
   };
 
-  const handleDurationChange = (newDuration: number) => {
+  const handleTitleEdit = () => {
+    setIsEditingTitle(false);
+    // 可以在这里添加保存逻辑
+  };
+
+  const handleDurationEdit = () => {
+    const newDuration = editDuration * 60;
     setOriginalDuration(newDuration);
     if (!hasStarted) {
       setTimeRemaining(newDuration);
     }
+    setIsEditingDuration(false);
   };
 
   // 个人计时器管理
@@ -298,54 +310,70 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     <Card className={`mb-4 border-2 ${getBackgroundColor()} transition-all duration-300`}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className={`font-semibold ${getTextColor()}`}>{agendaItem.title}</h3>
-            <p className={`text-sm ${getTextColor()} opacity-80`}>
-              总时长: {formatTime(originalDuration)} | 演讲者: {agendaItem.speaker || '未指定'}
-            </p>
+          <div className="flex-1">
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="bg-white/20 border-white/30"
+                  onBlur={handleTitleEdit}
+                  onKeyPress={(e) => e.key === 'Enter' && handleTitleEdit()}
+                  autoFocus
+                />
+                <Button size="sm" variant="ghost" onClick={handleTitleEdit} className={getTextColor()}>
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setIsEditingTitle(false)} className={getTextColor()}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div 
+                className={`font-semibold ${getTextColor()} cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-2`}
+                onClick={() => setIsEditingTitle(true)}
+              >
+                {agendaItem.title}
+                <Edit2 className="h-3 w-3 opacity-50" />
+              </div>
+            )}
+            
+            <div className="flex items-center gap-4 mt-1">
+              {isEditingDuration ? (
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm ${getTextColor()} opacity-80`}>总时长:</span>
+                  <Input
+                    type="number"
+                    value={editDuration}
+                    onChange={(e) => setEditDuration(parseInt(e.target.value) || 1)}
+                    className="w-16 h-6 text-xs bg-white/20 border-white/30"
+                    onBlur={handleDurationEdit}
+                    onKeyPress={(e) => e.key === 'Enter' && handleDurationEdit()}
+                    autoFocus
+                  />
+                  <span className={`text-sm ${getTextColor()} opacity-80`}>分钟</span>
+                  <Button size="sm" variant="ghost" onClick={handleDurationEdit} className={getTextColor()}>
+                    <Check className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div 
+                  className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
+                  onClick={() => setIsEditingDuration(true)}
+                >
+                  总时长: {formatTime(originalDuration)}
+                  <Edit2 className="h-3 w-3 opacity-50" />
+                </div>
+              )}
+              
+              <div className={`text-sm ${getTextColor()} opacity-80`}>
+                演讲者: {agendaItem.speaker || '未指定'}
+              </div>
+            </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
             ×
           </Button>
-        </div>
-
-        {/* 手动设置区域 */}
-        <div className="mb-4 border rounded p-3">
-          <div className="flex items-center justify-between mb-3">
-            <Label className={getTextColor()}>手动调整设置</Label>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowManualSettings(!showManualSettings)}
-              className={getTextColor()}
-            >
-              <Settings className="h-4 w-4 mr-1" />
-              {showManualSettings ? '收起' : '展开'}
-            </Button>
-          </div>
-
-          {showManualSettings && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className={getTextColor()}>环节名称</Label>
-                <Input
-                  value={agendaItem.title}
-                  readOnly
-                  className="bg-white/20 border-white/30"
-                />
-              </div>
-              <div>
-                <Label className={getTextColor()}>总时长(分钟)</Label>
-                <Input
-                  type="number"
-                  value={Math.round(originalDuration / 60)}
-                  onChange={(e) => handleDurationChange(parseInt(e.target.value) * 60 || 180)}
-                  className="bg-white/20 border-white/30"
-                  disabled={hasStarted}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 主倒计时显示 */}
