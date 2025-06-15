@@ -2,6 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Volume2 } from 'lucide-react';
+import CurrentTime from '@/components/CurrentTime';
 
 interface TimerDisplayProps {
   timeElapsed: number;
@@ -51,21 +52,32 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
   return (
     <div className="text-center mb-4">
-      <div className={`text-4xl font-mono font-bold mb-2 ${
-        currentPhase === 'red' || currentPhase === 'white' ? 'text-red-600' : 
-        currentPhase === 'yellow' ? 'text-yellow-600' : 
-        currentPhase === 'green' ? 'text-green-600' : 'text-gray-800'
-      }`}>
-        {formatTime(timeElapsed)}
-      </div>
-      <div className="text-lg text-gray-600 mb-2">
-        剩余: {getRemainingTime()}
-      </div>
-      {isOvertime && (
-        <div className="text-red-600 font-semibold">
-          超时: {formatTime(overtimeAmount)}
+      {/* 响应式布局：小屏幕垂直排列，大屏幕水平排列 */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-8 mb-4">
+        {/* 计时器显示 */}
+        <div className="flex-1">
+          <div className={`text-4xl font-mono font-bold mb-2 ${
+            currentPhase === 'red' || currentPhase === 'white' ? 'text-red-600' : 
+            currentPhase === 'yellow' ? 'text-yellow-600' : 
+            currentPhase === 'green' ? 'text-green-600' : 'text-gray-800'
+          }`}>
+            {formatTime(timeElapsed)}
+          </div>
+          <div className="text-lg text-gray-600 mb-2">
+            剩余: {getRemainingTime()}
+          </div>
+          {isOvertime && (
+            <div className="text-red-600 font-semibold">
+              超时: {formatTime(overtimeAmount)}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* 当前时间显示 */}
+        <div className="lg:border-l lg:border-gray-200 lg:pl-8">
+          <CurrentTime />
+        </div>
+      </div>
       
       <div className="flex justify-center mb-4">
         <Badge className={`${getPhaseColor(currentPhase)} text-lg px-4 py-2`}>
