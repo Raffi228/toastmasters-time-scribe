@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Trash2 } from 'lucide-react';
 import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
@@ -41,7 +41,7 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   
   // 编辑状态
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editingField, setEditingField] = useState<'title' | 'speaker' | 'duration' | null>(null);
+  const [editingField, setEditingField] = useState<'title' | 'speaker' | 'duration' | 'type' | null>(null);
   const [editValue, setEditValue] = useState('');
 
   const handleStartTimer = (agendaId: string) => {
@@ -94,7 +94,7 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   };
 
   // 编辑功能
-  const startEditing = (itemId: string, field: 'title' | 'speaker' | 'duration', currentValue: string | number) => {
+  const startEditing = (itemId: string, field: 'title' | 'speaker' | 'duration' | 'type', currentValue: string | number) => {
     setEditingItem(itemId);
     setEditingField(field);
     setEditValue(field === 'duration' ? Math.round(Number(currentValue) / 60).toString() : String(currentValue || ''));
@@ -113,12 +113,27 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
             return { ...item, speaker: editValue };
           } else if (editingField === 'duration') {
             return { ...item, duration: parseInt(editValue) * 60 };
+          } else if (editingField === 'type') {
+            return { ...item, type: editValue as 'speech' | 'evaluation' | 'table-topics' | 'break' };
           }
         }
         return item;
       })
     }));
 
+    cancelEdit();
+  };
+
+  const handleTypeChange = (itemId: string, newType: string) => {
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: prev.agenda.map(item => {
+        if (item.id === itemId) {
+          return { ...item, type: newType as 'speech' | 'evaluation' | 'table-topics' | 'break' };
+        }
+        return item;
+      })
+    }));
     cancelEdit();
   };
 
@@ -139,6 +154,16 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getTypeDisplayName = (type: string) => {
+    switch (type) {
+      case 'speech': return '备稿演讲';
+      case 'evaluation': return '点评环节';
+      case 'table-topics': return '即兴演讲';
+      case 'break': return '休息时间';
+      default: return type;
+    }
   };
 
   const exportReport = () => {
@@ -398,11 +423,36 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                       
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-600 space-y-1">
-                          <div>类型: {
-                            item.type === 'speech' ? '备稿演讲' :
-                            item.type === 'evaluation' ? '点评环节' :
-                            item.type === 'table-topics' ? '即兴演讲' : '休息时间'
-                          }</div>
+                          <div className="flex items-center gap-2">
+                            <span>类型:</span>
+                            {/* 可编辑类型 */}
+                            {editingItem === item.id && editingField === 'type' ? (
+                              <div className="flex items-center gap-2">
+                                <Select value={editValue} onValueChange={(value) => handleTypeChange(item.id, value)}>
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="speech">备稿演讲</SelectItem>
+                                    <SelectItem value="evaluation">点评环节</SelectItem>
+                                    <SelectItem value="table-topics">即兴演讲</SelectItem>
+                                    <SelectItem value="break">休息时间</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span 
+                                className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
+                                onClick={() => startEditing(item.id, 'type', item.type)}
+                              >
+                                {getTypeDisplayName(item.type)}
+                                <Edit2 className="h-3 w-3 opacity-50" />
+                              </span>
+                            )}
+                          </div>
                           {timerRecords[item.id] && (
                             <div>实际用时: {formatTime(timerRecords[item.id].actualDuration)}</div>
                           )}
