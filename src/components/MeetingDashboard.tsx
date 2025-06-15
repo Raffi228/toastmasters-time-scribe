@@ -6,6 +6,7 @@ import { ArrowLeft, Clock, Play, FileText, Download, Upload } from 'lucide-react
 import InlineTimer from '@/components/InlineTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
+import TimerReport from '@/components/reports/TimerReport';
 
 interface Meeting {
   id: string;
@@ -30,7 +31,7 @@ interface MeetingDashboardProps {
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
-  const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set()); // 支持多个计时器
+  const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
@@ -184,7 +185,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Agenda List */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             {/* Active Timers */}
             {Array.from(activeTimers).map(timerId => {
               const agendaItem = meetingData.agenda.find(item => item.id === timerId);
@@ -200,6 +201,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
               );
             })}
 
+            {/* Agenda Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -273,6 +275,14 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Timer Report */}
+            {Object.keys(timerRecords).length > 0 && (
+              <TimerReport 
+                agenda={meetingData.agenda}
+                timerRecords={timerRecords}
+              />
+            )}
           </div>
 
           {/* Summary Panel */}
