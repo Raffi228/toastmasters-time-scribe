@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Tr
 import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
+import AddAgendaDialog from '@/components/AddAgendaDialog';
 import TimerReport from '@/components/reports/TimerReport';
 
 interface Meeting {
@@ -35,6 +36,7 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
   const [meetingData, setMeetingData] = useState(meeting);
@@ -71,6 +73,18 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setTimeout(() => {
       startEditing(newItem.id, 'title', newItem.title);
     }, 100);
+  };
+
+  const handleAddAgendaItem = (item: { title: string; duration: number; type: 'speech' | 'evaluation' | 'table-topics' | 'break'; speaker?: string }) => {
+    const newItem = {
+      id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...item
+    };
+
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: [...prev.agenda, newItem]
+    }));
   };
 
   const handleStartTimer = (agendaId: string) => {
@@ -312,32 +326,14 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                     <Clock className="h-5 w-5 mr-2" />
                     会议议程
                   </CardTitle>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => addNewAgendaItem('speech')}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      添加演讲
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addNewAgendaItem('evaluation')}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      添加点评
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addNewAgendaItem('table-topics')}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      添加即兴
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddDialogOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    添加议程
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -671,6 +667,12 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
         onImport={handleImportAgenda}
+      />
+
+      <AddAgendaDialog
+        isOpen={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={handleAddAgendaItem}
       />
     </div>
   );
