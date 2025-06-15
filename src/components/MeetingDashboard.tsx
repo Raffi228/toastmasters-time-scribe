@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Play, Pause, Square, FileText, Download } from 'lucide-react';
-import TimerComponent from '@/components/TimerComponent';
+import { ArrowLeft, Clock, Play, FileText, Download, Upload } from 'lucide-react';
+import InlineTimer from '@/components/InlineTimer';
 import EvaluationForm from '@/components/EvaluationForm';
+import ImportAgendaDialog from '@/components/ImportAgendaDialog';
 
 interface Meeting {
   id: string;
@@ -28,14 +28,16 @@ interface MeetingDashboardProps {
 }
 
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'timer' | 'evaluation'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
+  const [activeTimer, setActiveTimer] = useState<string | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
+  const [meetingData, setMeetingData] = useState(meeting);
 
   const handleStartTimer = (agendaId: string) => {
-    setSelectedAgenda(agendaId);
-    setCurrentView('timer');
+    setActiveTimer(agendaId);
   };
 
   const handleStartEvaluation = (agendaId: string) => {
@@ -48,7 +50,11 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
       ...prev,
       [agendaId]: data
     }));
-    setCurrentView('dashboard');
+    setActiveTimer(null);
+  };
+
+  const handleTimerClose = () => {
+    setActiveTimer(null);
   };
 
   const handleEvaluationSave = (agendaId: string, data: { content: string; strengths: string[]; improvements: string[]; }) => {
@@ -59,6 +65,18 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setCurrentView('dashboard');
   };
 
+  const handleImportAgenda = (importedAgenda: Array<Omit<Meeting['agenda'][0], 'id'>>) => {
+    const newAgenda = importedAgenda.map((item, index) => ({
+      ...item,
+      id: `imported-${Date.now()}-${index}`
+    }));
+
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: [...prev.agenda, ...newAgenda]
+    }));
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -67,10 +85,10 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
 
   const exportReport = () => {
     const reportData = {
-      meeting: meeting.title,
-      date: meeting.date,
-      time: meeting.time,
-      agenda: meeting.agenda.map(item => ({
+      meeting: meetingData.title,
+      date: meetingData.date,
+      time: meetingData.time,
+      agenda: meetingData.agenda.map(item => ({
         title: item.title,
         type: item.type,
         speaker: item.speaker,
@@ -104,24 +122,14 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${meeting.title}_会议记录_${meeting.date}.txt`;
+    a.download = `${meetingData.title}_会议记录_${meetingData.date}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const currentAgendaItem = meeting.agenda.find(item => item.id === selectedAgenda);
-
-  if (currentView === 'timer' && currentAgendaItem) {
-    return (
-      <TimerComponent
-        agendaItem={currentAgendaItem}
-        onComplete={(data) => handleTimerComplete(currentAgendaItem.id, data)}
-        onBack={() => setCurrentView('dashboard')}
-      />
-    );
-  }
+  const currentAgendaItem = meetingData.agenda.find(item => item.id === selectedAgenda);
 
   if (currentView === 'evaluation' && currentAgendaItem) {
     return (
@@ -146,14 +154,20 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                 返回
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{meeting.title}</h1>
-                <p className="text-sm text-gray-600">{meeting.date} {meeting.time}</p>
+                <h1 className="text-2xl font-bold text-gray-900">{meetingData.title}</h1>
+                <p className="text-sm text-gray-600">{meetingData.date} {meetingData.time}</p>
               </div>
             </div>
-            <Button onClick={exportReport} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              导出报告
-            </Button>
+            <div className="flex space-x-2">
+              <Button onClick={() => setIsImportDialogOpen(true)} variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                导入议程
+              </Button>
+              <Button onClick={exportReport} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                导出报告
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -163,6 +177,14 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Agenda List */}
           <div className="lg:col-span-2">
+            {/* Inline Timer */}
+            {activeTimer && (
+              <InlineTimer
+                onComplete={(data) => handleTimerComplete(activeTimer, data)}
+                onClose={handleTimerClose}
+              />
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -172,7 +194,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {meeting.agenda.map((item, index) => (
+                  {meetingData.agenda.map((item, index) => (
                     <div key={item.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
@@ -211,9 +233,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             size="sm"
                             onClick={() => handleStartTimer(item.id)}
                             className="bg-blue-600 hover:bg-blue-700"
+                            disabled={activeTimer === item.id}
                           >
                             <Play className="h-3 w-3 mr-1" />
-                            计时
+                            {activeTimer === item.id ? '计时中' : '计时'}
                           </Button>
                           <Button
                             size="sm"
@@ -244,13 +267,13 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">计划总时长</span>
                     <span className="font-medium">
-                      {formatTime(meeting.agenda.reduce((sum, item) => sum + item.duration, 0))}
+                      {formatTime(meetingData.agenda.reduce((sum, item) => sum + item.duration, 0))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">已记录项目</span>
                     <span className="font-medium">
-                      {Object.keys(timerRecords).length}/{meeting.agenda.length}
+                      {Object.keys(timerRecords).length}/{meetingData.agenda.length}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -273,11 +296,11 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">已完成点评</span>
                     <span className="font-medium">
-                      {Object.keys(evaluations).length}/{meeting.agenda.length}
+                      {Object.keys(evaluations).length}/{meetingData.agenda.length}
                     </span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    完成率: {Math.round((Object.keys(evaluations).length / meeting.agenda.length) * 100)}%
+                    完成率: {Math.round((Object.keys(evaluations).length / meetingData.agenda.length) * 100)}%
                   </div>
                 </div>
               </CardContent>
@@ -290,6 +313,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    批量导入议程
+                  </Button>
                   <Button className="w-full" variant="outline" onClick={exportReport}>
                     <Download className="h-4 w-4 mr-2" />
                     导出会议报告
@@ -300,6 +327,12 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
           </div>
         </div>
       </main>
+
+      <ImportAgendaDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onImport={handleImportAgenda}
+      />
     </div>
   );
 };
