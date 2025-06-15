@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Trash2, Plus } from 'lucide-react';
 import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
@@ -43,6 +43,35 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<'title' | 'speaker' | 'duration' | 'type' | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  // 新增议程项目
+  const addNewAgendaItem = (type: 'speech' | 'evaluation' | 'table-topics' | 'break' = 'speech') => {
+    const typeTemplates = {
+      speech: { title: '新的备稿演讲', duration: 420 },
+      evaluation: { title: '新的点评环节', duration: 180 },
+      'table-topics': { title: '新的即兴演讲', duration: 120 },
+      break: { title: '新的休息时间', duration: 300 }
+    };
+
+    const template = typeTemplates[type];
+    const newItem = {
+      id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: template.title,
+      duration: template.duration,
+      type: type,
+      speaker: ''
+    };
+
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: [...prev.agenda, newItem]
+    }));
+
+    // 自动进入编辑模式
+    setTimeout(() => {
+      startEditing(newItem.id, 'title', newItem.title);
+    }, 100);
+  };
 
   const handleStartTimer = (agendaId: string) => {
     setActiveTimers(prev => new Set([...prev, agendaId]));
@@ -278,10 +307,38 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             {/* Agenda Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2" />
-                  会议议程
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2" />
+                    会议议程
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => addNewAgendaItem('speech')}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      添加演讲
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addNewAgendaItem('evaluation')}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      添加点评
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addNewAgendaItem('table-topics')}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      添加即兴
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -480,6 +537,29 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                       </div>
                     </div>
                   ))}
+
+                  {/* 空状态提示 */}
+                  {meetingData.agenda.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="mb-4">暂无议程项目</p>
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => addNewAgendaItem('speech')}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          添加演讲项目
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsImportDialogOpen(true)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          批量导入
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -568,6 +648,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  <Button className="w-full" variant="outline" onClick={() => addNewAgendaItem('speech')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    添加新议程项目
+                  </Button>
                   <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                     <Upload className="h-4 w-4 mr-2" />
                     智能导入议程
