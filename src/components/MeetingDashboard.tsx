@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Play, FileText, Download, Upload } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Trash2 } from 'lucide-react';
 import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
@@ -36,6 +38,11 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
   const [meetingData, setMeetingData] = useState(meeting);
+  
+  // 编辑状态
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<'title' | 'speaker' | 'duration' | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const handleStartTimer = (agendaId: string) => {
     setActiveTimers(prev => new Set([...prev, agendaId]));
@@ -83,6 +90,48 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setMeetingData(prev => ({
       ...prev,
       agenda: [...prev.agenda, ...newAgenda]
+    }));
+  };
+
+  // 编辑功能
+  const startEditing = (itemId: string, field: 'title' | 'speaker' | 'duration', currentValue: string | number) => {
+    setEditingItem(itemId);
+    setEditingField(field);
+    setEditValue(field === 'duration' ? Math.round(Number(currentValue) / 60).toString() : String(currentValue || ''));
+  };
+
+  const saveEdit = () => {
+    if (!editingItem || !editingField) return;
+
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: prev.agenda.map(item => {
+        if (item.id === editingItem) {
+          if (editingField === 'title') {
+            return { ...item, title: editValue };
+          } else if (editingField === 'speaker') {
+            return { ...item, speaker: editValue };
+          } else if (editingField === 'duration') {
+            return { ...item, duration: parseInt(editValue) * 60 };
+          }
+        }
+        return item;
+      })
+    }));
+
+    cancelEdit();
+  };
+
+  const cancelEdit = () => {
+    setEditingItem(null);
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  const deleteAgendaItem = (itemId: string) => {
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: prev.agenda.filter(item => item.id !== itemId)
     }));
   };
 
@@ -214,17 +263,116 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                   {meetingData.agenda.map((item, index) => (
                     <div key={item.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 flex-1">
                           <Badge variant="outline">#{index + 1}</Badge>
-                          <h3 className="font-medium">{item.title}</h3>
-                          {item.speaker && (
-                            <Badge variant="secondary">{item.speaker}</Badge>
+                          
+                          {/* 可编辑标题 */}
+                          {editingItem === item.id && editingField === 'title' ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <Input
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="flex-1"
+                                onBlur={saveEdit}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEdit();
+                                  if (e.key === 'Escape') cancelEdit();
+                                }}
+                                autoFocus
+                              />
+                              <Button size="sm" variant="ghost" onClick={saveEdit}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <h3 
+                              className="font-medium cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1 flex-1"
+                              onClick={() => startEditing(item.id, 'title', item.title)}
+                            >
+                              {item.title}
+                              <Edit2 className="h-3 w-3 opacity-50" />
+                            </h3>
+                          )}
+
+                          {/* 可编辑演讲者 */}
+                          {editingItem === item.id && editingField === 'speaker' ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-24"
+                                placeholder="演讲者"
+                                onBlur={saveEdit}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEdit();
+                                  if (e.key === 'Escape') cancelEdit();
+                                }}
+                                autoFocus
+                              />
+                              <Button size="sm" variant="ghost" onClick={saveEdit}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : item.speaker ? (
+                            <Badge 
+                              variant="secondary" 
+                              className="cursor-pointer hover:bg-gray-200 flex items-center gap-1"
+                              onClick={() => startEditing(item.id, 'speaker', item.speaker || '')}
+                            >
+                              {item.speaker}
+                              <Edit2 className="h-3 w-3 opacity-50" />
+                            </Badge>
+                          ) : (
+                            <span 
+                              className="text-sm text-gray-500 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
+                              onClick={() => startEditing(item.id, 'speaker', '')}
+                            >
+                              + 添加演讲者
+                              <Edit2 className="h-3 w-3 opacity-50" />
+                            </span>
                           )}
                         </div>
+                        
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">
-                            {formatTime(item.duration)}
-                          </span>
+                          {/* 可编辑时长 */}
+                          {editingItem === item.id && editingField === 'duration' ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-16"
+                                onBlur={saveEdit}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEdit();
+                                  if (e.key === 'Escape') cancelEdit();
+                                }}
+                                autoFocus
+                              />
+                              <span className="text-sm text-gray-500">分钟</span>
+                              <Button size="sm" variant="ghost" onClick={saveEdit}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span 
+                              className="text-sm text-gray-500 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
+                              onClick={() => startEditing(item.id, 'duration', item.duration)}
+                            >
+                              {formatTime(item.duration)}
+                              <Edit2 className="h-3 w-3 opacity-50" />
+                            </span>
+                          )}
+                          
                           {timerRecords[item.id] && (
                             <Badge variant={timerRecords[item.id].isOvertime ? "destructive" : "default"}>
                               {timerRecords[item.id].isOvertime ? "超时" : "按时"}
@@ -235,6 +383,16 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                               计时中
                             </Badge>
                           )}
+                          
+                          {/* 删除按钮 */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteAgendaItem(item.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                       
