@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RotateCcw, Volume2, Settings } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2 } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
 
 interface AdvancedTimerProps {
@@ -21,11 +20,20 @@ interface AdvancedTimerProps {
   onClose: () => void;
 }
 
+interface PersonalTimer {
+  id: string;
+  name: string;
+  timeElapsed: number;
+  isRunning: boolean;
+}
+
 const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, onClose }) => {
   const [timeRemaining, setTimeRemaining] = useState(agendaItem.duration);
+  const [originalDuration, setOriginalDuration] = useState(agendaItem.duration);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [showCustomRules, setShowCustomRules] = useState(false);
+  const [showManualSettings, setShowManualSettings] = useState(false);
   const [selectedType, setSelectedType] = useState<AgendaType>(() => 
     getTypeFromTitle(agendaItem.title, agendaItem.duration)
   );
@@ -33,10 +41,22 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     PRESET_RULES[getTypeFromTitle(agendaItem.title, agendaItem.duration)]
   );
   
+  // 即兴演讲个人计时器
+  const [isTableTopics, setIsTableTopics] = useState(false);
+  const [personalTimers, setPersonalTimers] = useState<PersonalTimer[]>([]);
+  const [newPersonName, setNewPersonName] = useState('');
+  
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const personalIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const pausedTimeRef = useRef<number>(0);
+
+  // 检查是否为即兴演讲环节
+  useEffect(() => {
+    const isImpromptu = agendaItem.title.includes('即兴') || 
+                       agendaItem.title.toLowerCase().includes('table topics') ||
+                       selectedType === 'shortEval';
+    setIsTableTopics(isImpromptu);
+  }, [agendaItem.title, selectedType]);
 
   // 初始化音频上下文
   useEffect(() => {
@@ -52,10 +72,13 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      Object.values(personalIntervalsRef.current).forEach(interval => {
+        clearInterval(interval);
+      });
     };
   }, []);
 
-  // 计时器逻辑
+  // 主计时器逻辑
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -73,6 +96,29 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
       }
     };
   }, [isRunning]);
+
+  // 个人计时器逻辑
+  useEffect(() => {
+    personalTimers.forEach(timer => {
+      if (timer.isRunning && !personalIntervalsRef.current[timer.id]) {
+        personalIntervalsRef.current[timer.id] = setInterval(() => {
+          setPersonalTimers(prev => prev.map(t => 
+            t.id === timer.id ? { ...t, timeElapsed: t.timeElapsed + 1 } : t
+          ));
+        }, 1000);
+      } else if (!timer.isRunning && personalIntervalsRef.current[timer.id]) {
+        clearInterval(personalIntervalsRef.current[timer.id]);
+        delete personalIntervalsRef.current[timer.id];
+      }
+    });
+
+    return () => {
+      Object.values(personalIntervalsRef.current).forEach(interval => {
+        clearInterval(interval);
+      });
+      personalIntervalsRef.current = {};
+    };
+  }, [personalTimers]);
 
   // 获取当前计时规则
   const getCurrentRules = (): TimerRules => {
@@ -142,24 +188,20 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const handleStart = () => {
     setIsRunning(true);
     setHasStarted(true);
-    startTimeRef.current = Date.now() - pausedTimeRef.current;
   };
 
   const handlePause = () => {
     setIsRunning(false);
-    pausedTimeRef.current = Date.now() - startTimeRef.current;
   };
 
   const handleReset = () => {
     setIsRunning(false);
-    setTimeRemaining(agendaItem.duration);
-    startTimeRef.current = 0;
-    pausedTimeRef.current = 0;
+    setTimeRemaining(originalDuration);
   };
 
   const handleStop = () => {
     setIsRunning(false);
-    const actualDuration = agendaItem.duration - timeRemaining;
+    const actualDuration = originalDuration - timeRemaining;
     const isOvertime = timeRemaining < 0;
     const overtimeAmount = Math.abs(Math.min(0, timeRemaining));
     
@@ -174,6 +216,52 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     setSelectedType(type);
     if (!showCustomRules) {
       setCustomRules(PRESET_RULES[type]);
+    }
+  };
+
+  const handleDurationChange = (newDuration: number) => {
+    setOriginalDuration(newDuration);
+    if (!hasStarted) {
+      setTimeRemaining(newDuration);
+    }
+  };
+
+  // 个人计时器管理
+  const addPersonalTimer = () => {
+    if (!newPersonName.trim()) return;
+    
+    const newTimer: PersonalTimer = {
+      id: Date.now().toString(),
+      name: newPersonName.trim(),
+      timeElapsed: 0,
+      isRunning: false
+    };
+    
+    setPersonalTimers(prev => [...prev, newTimer]);
+    setNewPersonName('');
+  };
+
+  const removePersonalTimer = (id: string) => {
+    setPersonalTimers(prev => prev.filter(t => t.id !== id));
+    if (personalIntervalsRef.current[id]) {
+      clearInterval(personalIntervalsRef.current[id]);
+      delete personalIntervalsRef.current[id];
+    }
+  };
+
+  const togglePersonalTimer = (id: string) => {
+    setPersonalTimers(prev => prev.map(timer => 
+      timer.id === id ? { ...timer, isRunning: !timer.isRunning } : timer
+    ));
+  };
+
+  const resetPersonalTimer = (id: string) => {
+    setPersonalTimers(prev => prev.map(timer => 
+      timer.id === id ? { ...timer, timeElapsed: 0, isRunning: false } : timer
+    ));
+    if (personalIntervalsRef.current[id]) {
+      clearInterval(personalIntervalsRef.current[id]);
+      delete personalIntervalsRef.current[id];
     }
   };
 
@@ -213,7 +301,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
           <div>
             <h3 className={`font-semibold ${getTextColor()}`}>{agendaItem.title}</h3>
             <p className={`text-sm ${getTextColor()} opacity-80`}>
-              总时长: {formatTime(agendaItem.duration)} | 演讲者: {agendaItem.speaker || '未指定'}
+              总时长: {formatTime(originalDuration)} | 演讲者: {agendaItem.speaker || '未指定'}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
@@ -221,7 +309,46 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
           </Button>
         </div>
 
-        {/* 倒计时显示 */}
+        {/* 手动设置区域 */}
+        <div className="mb-4 border rounded p-3">
+          <div className="flex items-center justify-between mb-3">
+            <Label className={getTextColor()}>手动调整设置</Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowManualSettings(!showManualSettings)}
+              className={getTextColor()}
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              {showManualSettings ? '收起' : '展开'}
+            </Button>
+          </div>
+
+          {showManualSettings && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className={getTextColor()}>环节名称</Label>
+                <Input
+                  value={agendaItem.title}
+                  readOnly
+                  className="bg-white/20 border-white/30"
+                />
+              </div>
+              <div>
+                <Label className={getTextColor()}>总时长(分钟)</Label>
+                <Input
+                  type="number"
+                  value={Math.round(originalDuration / 60)}
+                  onChange={(e) => handleDurationChange(parseInt(e.target.value) * 60 || 180)}
+                  className="bg-white/20 border-white/30"
+                  disabled={hasStarted}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 主倒计时显示 */}
         <div className="text-center mb-6">
           <div className={`text-6xl font-mono font-bold mb-2 ${getTextColor()}`}>
             {formatTime(timeRemaining)}
@@ -237,7 +364,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
           </Badge>
         </div>
 
-        {/* 控制按钮 */}
+        {/* 主控制按钮 */}
         <div className="flex justify-center space-x-3 mb-6">
           {!isRunning && (
             <Button onClick={handleStart} className="bg-green-600 hover:bg-green-700">
@@ -263,6 +390,64 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
             重置
           </Button>
         </div>
+
+        {/* 即兴演讲个人计时器 */}
+        {isTableTopics && (
+          <div className="border-t pt-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <Label className={getTextColor()}>个人计时器</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  placeholder="演讲者姓名"
+                  value={newPersonName}
+                  onChange={(e) => setNewPersonName(e.target.value)}
+                  className="w-32 bg-white/20 border-white/30"
+                  onKeyPress={(e) => e.key === 'Enter' && addPersonalTimer()}
+                />
+                <Button size="sm" onClick={addPersonalTimer} disabled={!newPersonName.trim()}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {personalTimers.map(timer => (
+                <div key={timer.id} className="flex items-center justify-between bg-white/10 rounded p-2">
+                  <div className="flex items-center space-x-3">
+                    <span className={`font-medium ${getTextColor()}`}>{timer.name}</span>
+                    <span className={`font-mono ${getTextColor()}`}>{formatTime(timer.timeElapsed)}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => togglePersonalTimer(timer.id)}
+                      className={getTextColor()}
+                    >
+                      {timer.isRunning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => resetPersonalTimer(timer.id)}
+                      className={getTextColor()}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removePersonalTimer(timer.id)}
+                      className={getTextColor()}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 规则配置 */}
         <div className="border-t pt-4">

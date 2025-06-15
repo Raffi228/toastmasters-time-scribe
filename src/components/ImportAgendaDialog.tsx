@@ -55,7 +55,7 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
       }
     }
 
-    return 180;
+    return 180; // 默认3分钟
   };
 
   const determineType = (title: string, duration: number): 'speech' | 'evaluation' | 'table-topics' | 'break' => {
@@ -72,13 +72,24 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
       case 'other':
       default:
         const titleLower = title.toLowerCase();
+        // 明确的休息或非计时环节
         if (titleLower.includes('休息') || titleLower.includes('break') || 
             titleLower.includes('中场') || titleLower.includes('暖场') ||
             titleLower.includes('来宾介绍') || titleLower.includes('合影') ||
-            titleLower.includes('颁奖') || titleLower.includes('投票')) {
+            titleLower.includes('颁奖') || titleLower.includes('投票') ||
+            titleLower.includes('茶歇') || titleLower.includes('networking')) {
           return 'break';
         }
-        return 'speech';
+        
+        // 根据时长推测
+        const durationMinutes = duration / 60;
+        if (durationMinutes >= 5 && durationMinutes <= 8) {
+          return 'speech';
+        } else if (durationMinutes <= 3) {
+          return 'evaluation';
+        } else {
+          return 'table-topics';
+        }
     }
   };
 
@@ -160,13 +171,13 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
     }
   };
 
-  const exampleText = `暖场环节 8分钟 Sherry.Zhang
-会议开场 1分钟 Sophy
-主席联合致辞 6分钟 许闻怡、童大喵、莫婷
-备稿演讲 - 技术出海新篇章 5-7分钟 Janson
+  const exampleText = `备稿演讲 - 技术出海新篇章 5-7分钟 Janson
 即兴演讲 - TikTok Refugee 25分钟 胡茶
 个体评估 - 备稿1 2-3分钟 佳霖
-时间官报告 1-2分钟 大米`;
+长评估 - 演讲技巧分析 4-5分钟 大米
+分享环节 - 职场经验 15分钟 张三
+主持开场 1-2分钟 Sophy
+休息茶歇 10分钟`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -184,20 +195,23 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({ isOpen, onClose
               智能识别功能：
             </label>
             <div className="bg-blue-50 p-3 rounded text-xs text-blue-800">
-              • 自动识别环节类型：备稿演讲、长/短评估、分享主持、其他<br/>
+              • 自动识别环节类型：备稿演讲、长/短评估、即兴演讲、分享主持、其他<br/>
               • 智能推荐计时规则：根据环节类型和时长自动匹配<br/>
-              • 支持时长范围：5-7分钟、1-2'、3:30等格式
+              • 支持时长范围：5-7分钟、1-2'、3:30等格式<br/>
+              • 即兴演讲支持个人计时器功能
             </div>
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">
-              支持的时长格式：
+              类型识别规则：
             </label>
             <div className="bg-gray-50 p-3 rounded text-xs text-gray-600">
-              • 范围格式：5-7分钟、1-2'<br/>
-              • 单一格式：8分钟、25'、3:30<br/>
-              • 纯数字：8（自动识别为分钟）
+              • 包含"备稿"→备稿演讲<br/>
+              • 包含"即兴"、"table topics"→即兴演讲<br/>
+              • 包含"评估"且>3分钟→长评估，≤3分钟→短评估<br/>
+              • 包含"分享"、"主持"、"介绍"→分享主持<br/>
+              • 包含"休息"、"茶歇"→休息时间
             </div>
           </div>
 
