@@ -18,7 +18,7 @@ interface AdvancedTimerProps {
   };
   onComplete: (data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => void;
   onClose: () => void;
-  onUpdate?: (updatedItem: { id: string; title: string; duration: number; speaker?: string }) => void;
+  onUpdate?: (updatedItem: { id: string; title: string; duration: number; speaker?: string; type: 'speech' | 'evaluation' | 'table-topics' | 'break' }) => void;
 }
 
 interface PersonalTimer {
@@ -28,19 +28,43 @@ interface PersonalTimer {
   isRunning: boolean;
 }
 
+// 类型映射函数：将议程类型映射到计时器类型
+const mapAgendaTypeToTimerType = (agendaType: string): AgendaType => {
+  switch (agendaType) {
+    case 'speech': return 'speech';
+    case 'evaluation': return 'longEval';
+    case 'table-topics': return 'shortEval';
+    case 'break': return 'other';
+    default: return 'other';
+  }
+};
+
+// 类型映射函数：将计时器类型映射到议程类型
+const mapTimerTypeToAgendaType = (timerType: AgendaType): 'speech' | 'evaluation' | 'table-topics' | 'break' => {
+  switch (timerType) {
+    case 'speech': return 'speech';
+    case 'longEval': 
+    case 'shortEval': return 'evaluation';
+    case 'shareHost': return 'speech';
+    case 'other': return 'break';
+    default: return 'break';
+  }
+};
+
 const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, onClose, onUpdate }) => {
   const [currentTitle, setCurrentTitle] = useState(agendaItem.title);
   const [currentSpeaker, setCurrentSpeaker] = useState(agendaItem.speaker || '');
+  const [currentType, setCurrentType] = useState(agendaItem.type);
   const [timeRemaining, setTimeRemaining] = useState(agendaItem.duration);
   const [originalDuration, setOriginalDuration] = useState(agendaItem.duration);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [showCustomRules, setShowCustomRules] = useState(false);
   const [selectedType, setSelectedType] = useState<AgendaType>(() => 
-    getTypeFromTitle(agendaItem.title, agendaItem.duration)
+    mapAgendaTypeToTimerType(agendaItem.type)
   );
   const [customRules, setCustomRules] = useState<TimerRules>(() => 
-    PRESET_RULES[getTypeFromTitle(agendaItem.title, agendaItem.duration)]
+    PRESET_RULES[mapAgendaTypeToTimerType(agendaItem.type)]
   );
   
   // 即兴演讲个人计时器
@@ -62,11 +86,12 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
 
   // 检查是否为即兴演讲环节
   useEffect(() => {
-    const isImpromptu = agendaItem.title.includes('即兴') || 
-                       agendaItem.title.toLowerCase().includes('table topics') ||
-                       selectedType === 'shortEval';
+    const isImpromptu = currentType === 'table-topics' || 
+                       selectedType === 'shortEval' ||
+                       currentTitle.includes('即兴') || 
+                       currentTitle.toLowerCase().includes('table topics');
     setIsTableTopics(isImpromptu);
-  }, [agendaItem.title, selectedType]);
+  }, [currentType, selectedType, currentTitle]);
 
   // 初始化音频上下文
   useEffect(() => {
@@ -224,8 +249,22 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
 
   const handleTypeChange = (type: AgendaType) => {
     setSelectedType(type);
+    const newAgendaType = mapTimerTypeToAgendaType(type);
+    setCurrentType(newAgendaType);
+    
     if (!showCustomRules) {
       setCustomRules(PRESET_RULES[type]);
+    }
+    
+    // 通知父组件更新
+    if (onUpdate) {
+      onUpdate({
+        id: agendaItem.id,
+        title: currentTitle,
+        duration: originalDuration,
+        speaker: currentSpeaker,
+        type: newAgendaType
+      });
     }
   };
 
@@ -239,7 +278,8 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         id: agendaItem.id,
         title: editTitle,
         duration: originalDuration,
-        speaker: currentSpeaker
+        speaker: currentSpeaker,
+        type: currentType
       });
     }
   };
@@ -258,7 +298,8 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         id: agendaItem.id,
         title: currentTitle,
         duration: newDuration,
-        speaker: currentSpeaker
+        speaker: currentSpeaker,
+        type: currentType
       });
     }
   };
@@ -273,7 +314,8 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         id: agendaItem.id,
         title: currentTitle,
         duration: originalDuration,
-        speaker: editSpeaker
+        speaker: editSpeaker,
+        type: currentType
       });
     }
   };
@@ -343,6 +385,18 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
       case 'yellow': return '黄牌 - 准备结束';
       case 'green': return '绿牌 - 时间充足';
       default: return '正常计时';
+    }
+  };
+
+  // 获取类型显示名称
+  const getTypeDisplayName = (type: AgendaType) => {
+    switch (type) {
+      case 'speech': return '备稿演讲';
+      case 'longEval': return '长评估';
+      case 'shortEval': return '即兴/短评估';
+      case 'shareHost': return '分享/主持';
+      case 'other': return '其他环节';
+      default: return type;
     }
   };
 
@@ -558,10 +612,10 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
               <div>
                 <Label className={getTextColor()}>环节类型</Label>
                 <Select value={selectedType} onValueChange={handleTypeChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white/20 border-white/30">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="speech">备稿演讲</SelectItem>
                     <SelectItem value="longEval">长评估</SelectItem>
                     <SelectItem value="shortEval">即兴/短评估</SelectItem>
@@ -574,6 +628,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
                 <div className={`${getTextColor()} opacity-80`}>规则预览:</div>
                 <div className={`${getTextColor()} opacity-70`}>绿牌: 剩余 {formatTime(rules.green)}</div>
                 <div className={`${getTextColor()} opacity-70`}>黄牌: 剩余 {formatTime(rules.yellow)}</div>
+                <div className={`${getTextColor()} opacity-70`}>当前类型: {getTypeDisplayName(selectedType)}</div>
               </div>
             </div>
           ) : (
