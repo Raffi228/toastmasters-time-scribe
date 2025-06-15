@@ -30,14 +30,14 @@ interface MeetingDashboardProps {
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
-  const [activeTimer, setActiveTimer] = useState<string | null>(null);
+  const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set()); // 支持多个计时器
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
   const [meetingData, setMeetingData] = useState(meeting);
 
   const handleStartTimer = (agendaId: string) => {
-    setActiveTimer(agendaId);
+    setActiveTimers(prev => new Set([...prev, agendaId]));
   };
 
   const handleStartEvaluation = (agendaId: string) => {
@@ -50,11 +50,19 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
       ...prev,
       [agendaId]: data
     }));
-    setActiveTimer(null);
+    setActiveTimers(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(agendaId);
+      return newSet;
+    });
   };
 
-  const handleTimerClose = () => {
-    setActiveTimer(null);
+  const handleTimerClose = (agendaId: string) => {
+    setActiveTimers(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(agendaId);
+      return newSet;
+    });
   };
 
   const handleEvaluationSave = (agendaId: string, data: { content: string; strengths: string[]; improvements: string[]; }) => {
@@ -177,13 +185,20 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Agenda List */}
           <div className="lg:col-span-2">
-            {/* Inline Timer */}
-            {activeTimer && (
-              <InlineTimer
-                onComplete={(data) => handleTimerComplete(activeTimer, data)}
-                onClose={handleTimerClose}
-              />
-            )}
+            {/* Active Timers */}
+            {Array.from(activeTimers).map(timerId => {
+              const agendaItem = meetingData.agenda.find(item => item.id === timerId);
+              if (!agendaItem) return null;
+              
+              return (
+                <InlineTimer
+                  key={timerId}
+                  agendaItem={agendaItem}
+                  onComplete={(data) => handleTimerComplete(timerId, data)}
+                  onClose={() => handleTimerClose(timerId)}
+                />
+              );
+            })}
 
             <Card>
               <CardHeader>
@@ -213,6 +228,11 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                               {timerRecords[item.id].isOvertime ? "超时" : "按时"}
                             </Badge>
                           )}
+                          {activeTimers.has(item.id) && (
+                            <Badge className="bg-blue-500 text-white animate-pulse">
+                              计时中
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       
@@ -233,10 +253,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             size="sm"
                             onClick={() => handleStartTimer(item.id)}
                             className="bg-blue-600 hover:bg-blue-700"
-                            disabled={activeTimer === item.id}
+                            disabled={activeTimers.has(item.id)}
                           >
                             <Play className="h-3 w-3 mr-1" />
-                            {activeTimer === item.id ? '计时中' : '计时'}
+                            {activeTimers.has(item.id) ? '计时中' : '计时'}
                           </Button>
                           <Button
                             size="sm"
@@ -282,6 +302,23 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                       {Object.values(timerRecords).filter(record => record.isOvertime).length}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">进行中计时器</span>
+                    <span className="font-medium text-blue-600">
+                      {activeTimers.size}
+                    </span>
+                  </div>
+                  {Object.keys(timerRecords).length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">实际用时统计</h4>
+                      <div className="text-sm text-gray-600">
+                        总实际用时: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.actualDuration, 0))}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        总超时: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.overtimeAmount, 0))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

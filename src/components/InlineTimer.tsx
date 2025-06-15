@@ -6,31 +6,95 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Pause, Square, Volume2 } from 'lucide-react';
 
 interface InlineTimerProps {
+  agendaItem: {
+    id: string;
+    title: string;
+    duration: number;
+    type: 'speech' | 'evaluation' | 'table-topics' | 'break';
+  };
   onComplete: (data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => void;
   onClose: () => void;
 }
 
-const InlineTimer: React.FC<InlineTimerProps> = ({ onComplete, onClose }) => {
+const InlineTimer: React.FC<InlineTimerProps> = ({ agendaItem, onComplete, onClose }) => {
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [targetDuration, setTargetDuration] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Preset durations in seconds
-  const presetDurations = [
-    { label: '1分钟', value: 60 },
-    { label: '2分钟', value: 120 },
-    { label: '3分钟', value: 180 },
-    { label: '5分钟', value: 300 },
-    { label: '7分钟', value: 420 },
-    { label: '10分钟', value: 600 }
-  ];
-
-  const isOvertime = timeElapsed > targetDuration && targetDuration > 0;
+  const targetDuration = agendaItem.duration;
+  const isOvertime = timeElapsed > targetDuration;
   const overtimeAmount = Math.max(0, timeElapsed - targetDuration);
-  const warningTime = targetDuration * 0.8;
+
+  // 头马计时规则配置
+  const getTimingRules = () => {
+    const durationMinutes = targetDuration / 60;
+    
+    if (agendaItem.type === 'speech' || (agendaItem.type === 'evaluation' && durationMinutes >= 3)) {
+      // 备稿演讲、大于3分钟的评估
+      return {
+        green: targetDuration - 120, // 剩2分钟
+        yellow: targetDuration - 60,  // 剩1分钟
+        red: targetDuration,          // 时间到
+        white: targetDuration + 30    // 30秒后立即停止
+      };
+    } else if (agendaItem.type === 'table-topics' || (agendaItem.type === 'evaluation' && durationMinutes < 3)) {
+      // 即兴演讲、小于3分钟的评估
+      return {
+        green: targetDuration - 60,   // 剩1分钟
+        yellow: targetDuration - 30,  // 剩30秒
+        red: targetDuration,          // 时间到
+        white: null
+      };
+    } else if (agendaItem.title.includes('分享') || agendaItem.title.includes('主持')) {
+      // 分享、即兴主持
+      return {
+        green: targetDuration - 300,  // 剩5分钟
+        yellow: targetDuration - 120, // 剩2分钟
+        red: targetDuration,          // 时间到
+        white: null
+      };
+    } else {
+      // 其他环节
+      return {
+        green: targetDuration,        // 时间合格
+        yellow: targetDuration - 30,  // 剩30秒
+        red: targetDuration,          // 时间到
+        white: null
+      };
+    }
+  };
+
+  const timingRules = getTimingRules();
+
+  const getCurrentPhase = () => {
+    if (timingRules.white && timeElapsed >= timingRules.white) return 'white';
+    if (timeElapsed >= timingRules.red) return 'red';
+    if (timeElapsed >= timingRules.yellow) return 'yellow';
+    if (timeElapsed >= timingRules.green) return 'green';
+    return 'none';
+  };
+
+  const getPhaseColor = (phase: string) => {
+    switch (phase) {
+      case 'green': return 'bg-green-500 text-white';
+      case 'yellow': return 'bg-yellow-500 text-white';
+      case 'red': return 'bg-red-500 text-white';
+      case 'white': return 'bg-white text-black border-2 border-black';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPhaseText = (phase: string) => {
+    switch (phase) {
+      case 'green': return '绿牌';
+      case 'yellow': return '黄牌';
+      case 'red': return '红牌';
+      case 'white': return '白牌 - 立即停止';
+      default: return '准备中';
+    }
+  };
 
   useEffect(() => {
     // Create audio context for beep sound
@@ -84,20 +148,14 @@ const InlineTimer: React.FC<InlineTimerProps> = ({ onComplete, onClose }) => {
   }, [isRunning]);
 
   useEffect(() => {
-    // Play warning sound at 80% and at target time
-    if (targetDuration > 0 && (timeElapsed === Math.floor(warningTime) || timeElapsed === targetDuration)) {
+    // 阶段变化时播放提示音
+    const phase = getCurrentPhase();
+    if (phase !== 'none' && (timeElapsed === timingRules.green || timeElapsed === timingRules.yellow || timeElapsed === timingRules.red)) {
       if (audioRef.current) {
         audioRef.current.play();
       }
     }
-  }, [timeElapsed, warningTime, targetDuration]);
-
-  const handleDurationSelect = (duration: number) => {
-    setTargetDuration(duration);
-    setTimeElapsed(0);
-    setIsRunning(false);
-    setHasStarted(false);
-  };
+  }, [timeElapsed]);
 
   const handleStart = () => {
     setIsRunning(true);
@@ -123,79 +181,49 @@ const InlineTimer: React.FC<InlineTimerProps> = ({ onComplete, onClose }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getTimerColor = () => {
-    if (isOvertime) return 'text-red-600';
-    if (timeElapsed >= warningTime && targetDuration > 0) return 'text-yellow-600';
-    return 'text-green-600';
+  const getRemainingTime = () => {
+    const remaining = Math.max(0, targetDuration - timeElapsed);
+    return formatTime(remaining);
   };
 
+  const currentPhase = getCurrentPhase();
+
   return (
-    <Card className="mb-4">
+    <Card className="mb-4 border-2" style={{ borderColor: currentPhase === 'white' ? '#000' : currentPhase === 'red' ? '#ef4444' : currentPhase === 'yellow' ? '#eab308' : currentPhase === 'green' ? '#22c55e' : '#e5e7eb' }}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">计时器</h3>
+          <div>
+            <h3 className="font-semibold">{agendaItem.title}</h3>
+            <p className="text-sm text-gray-600">目标时长: {formatTime(targetDuration)}</p>
+          </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             ×
           </Button>
         </div>
 
-        {!hasStarted && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-2">选择计时时长：</p>
-            <div className="grid grid-cols-3 gap-2">
-              {presetDurations.map((preset) => (
-                <Button
-                  key={preset.value}
-                  variant={targetDuration === preset.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleDurationSelect(preset.value)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
+        <div className="text-center mb-4">
+          <div className={`text-4xl font-mono font-bold mb-2 ${currentPhase === 'red' || currentPhase === 'white' ? 'text-red-600' : currentPhase === 'yellow' ? 'text-yellow-600' : currentPhase === 'green' ? 'text-green-600' : 'text-gray-800'}`}>
+            {formatTime(timeElapsed)}
           </div>
-        )}
-
-        {targetDuration > 0 && (
-          <div className="text-center mb-4">
-            <div className={`text-4xl font-mono font-bold ${getTimerColor()}`}>
-              {formatTime(timeElapsed)}
-            </div>
-            <div className="text-sm text-gray-600">
-              目标: {formatTime(targetDuration)}
-            </div>
-            {isOvertime && (
-              <div className="text-red-600 font-semibold">
-                超时: {formatTime(overtimeAmount)}
-              </div>
-            )}
+          <div className="text-lg text-gray-600 mb-2">
+            剩余: {getRemainingTime()}
           </div>
-        )}
-
-        <div className="flex justify-center space-x-2 mb-4">
-          {timeElapsed >= warningTime && timeElapsed < targetDuration && targetDuration > 0 && (
-            <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-              <Volume2 className="h-3 w-3 mr-1" />
-              接近时间
-            </Badge>
-          )}
-          {timeElapsed >= targetDuration && !isOvertime && targetDuration > 0 && (
-            <Badge variant="outline" className="text-blue-600 border-blue-600">
-              <Volume2 className="h-3 w-3 mr-1" />
-              时间到
-            </Badge>
-          )}
           {isOvertime && (
-            <Badge variant="destructive">
-              <Volume2 className="h-3 w-3 mr-1" />
-              超时
-            </Badge>
+            <div className="text-red-600 font-semibold">
+              超时: {formatTime(overtimeAmount)}
+            </div>
           )}
         </div>
 
+        <div className="flex justify-center mb-4">
+          <Badge className={`${getPhaseColor(currentPhase)} text-lg px-4 py-2`}>
+            <Volume2 className="h-4 w-4 mr-2" />
+            {getPhaseText(currentPhase)}
+          </Badge>
+        </div>
+
         <div className="flex justify-center space-x-2">
-          {!isRunning && targetDuration > 0 && (
+          {!isRunning && (
             <Button onClick={handleStart} size="sm" className="bg-green-600 hover:bg-green-700">
               <Play className="h-3 w-3 mr-1" />
               {hasStarted ? '继续' : '开始'}
@@ -214,6 +242,16 @@ const InlineTimer: React.FC<InlineTimerProps> = ({ onComplete, onClose }) => {
               </Button>
             </>
           )}
+        </div>
+
+        {/* 时间规则提示 */}
+        <div className="mt-4 text-xs text-gray-500">
+          <div className="grid grid-cols-2 gap-2">
+            <div>绿牌: {formatTime(Math.max(0, timingRules.green))}</div>
+            <div>黄牌: {formatTime(Math.max(0, timingRules.yellow))}</div>
+            <div>红牌: {formatTime(timingRules.red)}</div>
+            {timingRules.white && <div>白牌: {formatTime(timingRules.white)}</div>}
+          </div>
         </div>
       </CardContent>
     </Card>
