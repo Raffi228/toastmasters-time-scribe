@@ -140,7 +140,12 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   const startEditing = (itemId: string, field: 'title' | 'speaker' | 'duration' | 'type', currentValue: string | number) => {
     setEditingItem(itemId);
     setEditingField(field);
-    setEditValue(field === 'duration' ? Math.round(Number(currentValue) / 60).toString() : String(currentValue || ''));
+    if (field === 'duration') {
+      const minutes = Math.round(Number(currentValue) / 60);
+      setEditValue(minutes.toString());
+    } else {
+      setEditValue(String(currentValue || ''));
+    }
   };
 
   const saveEdit = () => {
@@ -155,7 +160,9 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
           } else if (editingField === 'speaker') {
             return { ...item, speaker: editValue };
           } else if (editingField === 'duration') {
-            return { ...item, duration: parseInt(editValue) * 60 };
+            // 限制时长在1-60分钟之间
+            const minutes = Math.max(1, Math.min(60, parseInt(editValue) || 1));
+            return { ...item, duration: minutes * 60 };
           } else if (editingField === 'type') {
             return { ...item, type: editValue as 'speech' | 'evaluation' | 'table-topics' | 'break' };
           }
@@ -165,6 +172,13 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     }));
 
     cancelEdit();
+  };
+
+  const handleDurationChange = (value: string) => {
+    // 只允许输入数字，并限制在1-60之间
+    const numValue = parseInt(value) || 1;
+    const clampedValue = Math.max(1, Math.min(60, numValue));
+    setEditValue(clampedValue.toString());
   };
 
   const handleTypeChange = (itemId: string, newType: string) => {
@@ -423,8 +437,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             <div className="flex items-center gap-2">
                               <Input
                                 type="number"
+                                min="1"
+                                max="60"
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={(e) => handleDurationChange(e.target.value)}
                                 className="w-16"
                                 onBlur={saveEdit}
                                 onKeyDown={(e) => {
