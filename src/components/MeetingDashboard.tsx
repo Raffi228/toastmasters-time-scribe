@@ -175,10 +175,8 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   };
 
   const handleDurationChange = (value: string) => {
-    // 允许空值和数字输入，在保存时再进行限制
-    if (value === '' || /^\d+$/.test(value)) {
-      setEditValue(value);
-    }
+    // 完全允许空值和任何数字输入，不做任何限制
+    setEditValue(value);
   };
 
   const handleTypeChange = (itemId: string, newType: string) => {
@@ -291,7 +289,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={onBack}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                返回
+                Back
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{meetingData.title}</h1>
@@ -301,11 +299,11 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             <div className="flex space-x-2">
               <Button onClick={() => setIsImportDialogOpen(true)} variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                智能导入议程
+                Smart Import Agenda
               </Button>
               <Button onClick={exportReport} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
-                导出报告
+                Export Report
               </Button>
             </div>
           </div>
@@ -338,7 +336,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center">
                     <Clock className="h-5 w-5 mr-2" />
-                    会议议程
+                    Meeting Agenda
                   </CardTitle>
                   <Button
                     size="sm"
@@ -346,7 +344,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    添加议程
+                    Add Agenda
                   </Button>
                 </div>
               </CardHeader>
@@ -358,7 +356,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                         <div className="flex items-center space-x-3 flex-1">
                           <Badge variant="outline">#{index + 1}</Badge>
                           
-                          {/* 可编辑标题 */}
+                          {/* Editable Title */}
                           {editingItem === item.id && editingField === 'title' ? (
                             <div className="flex items-center gap-2 flex-1">
                               <Input
@@ -389,14 +387,14 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             </h3>
                           )}
 
-                          {/* 可编辑演讲者 */}
+                          {/* Editable Speaker */}
                           {editingItem === item.id && editingField === 'speaker' ? (
                             <div className="flex items-center gap-2">
                               <Input
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
                                 className="w-24"
-                                placeholder="演讲者"
+                                placeholder="Speaker"
                                 onBlur={saveEdit}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') saveEdit();
@@ -425,20 +423,18 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                               className="text-sm text-gray-500 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
                               onClick={() => startEditing(item.id, 'speaker', '')}
                             >
-                              + 添加演讲者
+                              + Add Speaker
                               <Edit2 className="h-3 w-3 opacity-50" />
                             </span>
                           )}
                         </div>
                         
                         <div className="flex items-center space-x-2">
-                          {/* 可编辑时长 */}
+                          {/* Editable Duration */}
                           {editingItem === item.id && editingField === 'duration' ? (
                             <div className="flex items-center gap-2">
                               <Input
-                                type="number"
-                                min="1"
-                                max="60"
+                                type="text"
                                 value={editValue}
                                 onChange={(e) => handleDurationChange(e.target.value)}
                                 className="w-16"
@@ -448,8 +444,9 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                                   if (e.key === 'Escape') cancelEdit();
                                 }}
                                 autoFocus
+                                placeholder="1"
                               />
-                              <span className="text-sm text-gray-500">分钟</span>
+                              <span className="text-sm text-gray-500">min</span>
                               <Button size="sm" variant="ghost" onClick={saveEdit}>
                                 <Check className="h-3 w-3" />
                               </Button>
@@ -469,16 +466,16 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                           
                           {timerRecords[item.id] && (
                             <Badge variant={timerRecords[item.id].isOvertime ? "destructive" : "default"}>
-                              {timerRecords[item.id].isOvertime ? "超时" : "按时"}
+                              {timerRecords[item.id].isOvertime ? "Overtime" : "On Time"}
                             </Badge>
                           )}
                           {activeTimers.has(item.id) && (
                             <Badge className="bg-blue-500 text-white animate-pulse">
-                              计时中
+                              Timing
                             </Badge>
                           )}
                           
-                          {/* 删除按钮 */}
+                          {/* Delete Button */}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -493,8 +490,8 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-600 space-y-1">
                           <div className="flex items-center gap-2">
-                            <span>类型:</span>
-                            {/* 可编辑类型 */}
+                            <span>Type:</span>
+                            {/* Editable Type */}
                             {editingItem === item.id && editingField === 'type' ? (
                               <div className="flex items-center gap-2">
                                 <Select value={editValue} onValueChange={(value) => handleTypeChange(item.id, value)}>
@@ -502,10 +499,10 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="speech">备稿演讲</SelectItem>
-                                    <SelectItem value="evaluation">点评环节</SelectItem>
-                                    <SelectItem value="table-topics">即兴演讲</SelectItem>
-                                    <SelectItem value="break">休息时间</SelectItem>
+                                    <SelectItem value="speech">Speech</SelectItem>
+                                    <SelectItem value="evaluation">Evaluation</SelectItem>
+                                    <SelectItem value="table-topics">Table Topics</SelectItem>
+                                    <SelectItem value="break">Break</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <Button size="sm" variant="ghost" onClick={cancelEdit}>
@@ -523,7 +520,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             )}
                           </div>
                           {timerRecords[item.id] && (
-                            <div>实际用时: {formatTime(timerRecords[item.id].actualDuration)}</div>
+                            <div>Actual Duration: {formatTime(timerRecords[item.id].actualDuration)}</div>
                           )}
                         </div>
                         
@@ -535,7 +532,7 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             disabled={activeTimers.has(item.id)}
                           >
                             <Play className="h-3 w-3 mr-1" />
-                            {activeTimers.has(item.id) ? '计时中' : '智能计时'}
+                            {activeTimers.has(item.id) ? 'Timing' : 'Smart Timer'}
                           </Button>
                           <Button
                             size="sm"
@@ -543,31 +540,31 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
                             onClick={() => handleStartEvaluation(item.id)}
                           >
                             <FileText className="h-3 w-3 mr-1" />
-                            点评
+                            Evaluate
                           </Button>
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  {/* 空状态提示 */}
+                  {/* Empty State */}
                   {meetingData.agenda.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
-                      <p className="mb-4">暂无议程项目</p>
+                      <p className="mb-4">No agenda items yet</p>
                       <div className="flex justify-center gap-2">
                         <Button
                           variant="outline"
                           onClick={() => addNewAgendaItem('speech')}
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          添加演讲项目
+                          Add Speech Item
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => setIsImportDialogOpen(true)}
                         >
                           <Upload className="h-4 w-4 mr-2" />
-                          批量导入
+                          Batch Import
                         </Button>
                       </div>
                     </div>
@@ -590,42 +587,42 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             {/* Time Summary */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">时间统计</CardTitle>
+                <CardTitle className="text-lg">Time Statistics</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">计划总时长</span>
+                    <span className="text-sm text-gray-600">Planned Total Duration</span>
                     <span className="font-medium">
                       {formatTime(meetingData.agenda.reduce((sum, item) => sum + item.duration, 0))}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">已记录项目</span>
+                    <span className="text-sm text-gray-600">Recorded Items</span>
                     <span className="font-medium">
                       {Object.keys(timerRecords).length}/{meetingData.agenda.length}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">超时项目</span>
+                    <span className="text-sm text-gray-600">Overtime Items</span>
                     <span className="font-medium text-red-600">
                       {Object.values(timerRecords).filter(record => record.isOvertime).length}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">进行中计时器</span>
+                    <span className="text-sm text-gray-600">Active Timers</span>
                     <span className="font-medium text-blue-600">
                       {activeTimers.size}
                     </span>
                   </div>
                   {Object.keys(timerRecords).length > 0 && (
                     <div className="mt-4 pt-3 border-t">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">实际用时统计</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Actual Duration Statistics</h4>
                       <div className="text-sm text-gray-600">
-                        总实际用时: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.actualDuration, 0))}
+                        Total Actual Duration: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.actualDuration, 0))}
                       </div>
                       <div className="text-sm text-gray-600">
-                        总超时: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.overtimeAmount, 0))}
+                        Total Overtime: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.overtimeAmount, 0))}
                       </div>
                     </div>
                   )}
@@ -636,18 +633,18 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             {/* Evaluation Summary */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">点评统计</CardTitle>
+                <CardTitle className="text-lg">Evaluation Statistics</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">已完成点评</span>
+                    <span className="text-sm text-gray-600">Completed Evaluations</span>
                     <span className="font-medium">
                       {Object.keys(evaluations).length}/{meetingData.agenda.length}
                     </span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    完成率: {Math.round((Object.keys(evaluations).length / meetingData.agenda.length) * 100)}%
+                    Completion Rate: {Math.round((Object.keys(evaluations).length / meetingData.agenda.length) * 100)}%
                   </div>
                 </div>
               </CardContent>
@@ -656,21 +653,21 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
             {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">快捷操作</CardTitle>
+                <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <Button className="w-full" variant="outline" onClick={() => addNewAgendaItem('speech')}>
                     <Plus className="h-4 w-4 mr-2" />
-                    添加新议程项目
+                    Add New Agenda Item
                   </Button>
                   <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                     <Upload className="h-4 w-4 mr-2" />
-                    智能导入议程
+                    Smart Import Agenda
                   </Button>
                   <Button className="w-full" variant="outline" onClick={exportReport}>
                     <Download className="h-4 w-4 mr-2" />
-                    导出会议报告
+                    Export Meeting Report
                   </Button>
                 </div>
               </CardContent>
