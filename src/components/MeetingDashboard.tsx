@@ -160,7 +160,7 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
           } else if (editingField === 'speaker') {
             return { ...item, speaker: editValue };
           } else if (editingField === 'duration') {
-            // 限制时长在1-60分钟之间
+            // 在保存时限制时长在1-60分钟之间，空值默认为1
             const minutes = Math.max(1, Math.min(60, parseInt(editValue) || 1));
             return { ...item, duration: minutes * 60 };
           } else if (editingField === 'type') {
@@ -175,10 +175,10 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   };
 
   const handleDurationChange = (value: string) => {
-    // 只允许输入数字，并限制在1-60之间
-    const numValue = parseInt(value) || 1;
-    const clampedValue = Math.max(1, Math.min(60, numValue));
-    setEditValue(clampedValue.toString());
+    // 允许空值和数字输入，在保存时再进行限制
+    if (value === '' || /^\d+$/.test(value)) {
+      setEditValue(value);
+    }
   };
 
   const handleTypeChange = (itemId: string, newType: string) => {
