@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Clock, Play, FileText, Download, Upload, Edit2, Check, X, Trash2, Plus } from 'lucide-react';
-import AdvancedTimer from '@/components/timer/AdvancedTimer';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
 import AddAgendaDialog from '@/components/AddAgendaDialog';
 import TimerReport from '@/components/reports/TimerReport';
+import MeetingHeader from '@/components/meeting/MeetingHeader';
+import AgendaList from '@/components/meeting/AgendaList';
+import MeetingSummary from '@/components/meeting/MeetingSummary';
+import FillerWordTracker from '@/components/meeting/FillerWordTracker';
 
 interface Meeting {
   id: string;
@@ -32,13 +29,14 @@ interface MeetingDashboardProps {
 }
 
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation' | 'filler-tracker'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [timerRecords, setTimerRecords] = useState<Record<string, { actualDuration: number; isOvertime: boolean; overtimeAmount: number }>>({});
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
+  const [fillerWordRecords, setFillerWordRecords] = useState<Record<string, any>>({});
   const [meetingData, setMeetingData] = useState(meeting);
   
   // 编辑状态
@@ -96,6 +94,11 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setCurrentView('evaluation');
   };
 
+  const handleStartFillerTracker = (agendaId: string) => {
+    setSelectedAgenda(agendaId);
+    setCurrentView('filler-tracker');
+  };
+
   const handleTimerComplete = (agendaId: string, data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => {
     setTimerRecords(prev => ({
       ...prev,
@@ -120,6 +123,14 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setEvaluations(prev => ({
       ...prev,
       [agendaId]: data
+    }));
+    setCurrentView('dashboard');
+  };
+
+  const handleFillerWordSave = (record: any) => {
+    setFillerWordRecords(prev => ({
+      ...prev,
+      [selectedAgenda!]: record
     }));
     setCurrentView('dashboard');
   };
@@ -230,11 +241,16 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
         title: item.title,
         type: item.type,
         speaker: item.speaker,
-        plannedDuration: formatTime(item.duration),
-        actualDuration: timerRecords[item.id] ? formatTime(timerRecords[item.id].actualDuration) : '未记录',
+        plannedDuration: Math.floor(item.duration / 60) + ':' + (item.duration % 60).toString().padStart(2, '0'),
+        actualDuration: timerRecords[item.id] ? Math.floor(timerRecords[item.id].actualDuration / 60) + ':' + (timerRecords[item.id].actualDuration % 60).toString().padStart(2, '0') : '未记录',
         isOvertime: timerRecords[item.id]?.isOvertime || false,
-        overtimeAmount: timerRecords[item.id] ? formatTime(timerRecords[item.id].overtimeAmount) : '0:00',
-        evaluation: evaluations[item.id]?.content || '无点评记录'
+        overtimeAmount: timerRecords[item.id] ? Math.floor(timerRecords[item.id].overtimeAmount / 60) + ':' + (timerRecords[item.id].overtimeAmount % 60).toString().padStart(2, '0') : '0:00',
+        evaluation: evaluations[item.id]?.content || '无点评记录',
+        fillerWords: fillerWordRecords[item.id] ? {
+          totalCount: fillerWordRecords[item.id].totalCount || 0,
+          details: fillerWordRecords[item.id].fillerWords || {},
+          notes: fillerWordRecords[item.id].notes || ''
+        } : null
       }))
     };
 
@@ -253,7 +269,20 @@ ${item.speaker ? `演讲者: ${item.speaker}` : ''}
 实际时长: ${item.actualDuration}
 ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
 点评记录: ${item.evaluation}
+
+=== 哼哈词记录 ===
+${item.fillerWords ? `
+总哼哈词数量: ${item.fillerWords.totalCount}
+详细统计: ${JSON.stringify(item.fillerWords.details, null, 2)}
+哼哈官备注: ${item.fillerWords.notes || '无'}
+` : '未记录哼哈词'}
 `).join('\n')}
+
+=== 会议总结 ===
+总计时记录: ${Object.keys(timerRecords).length}/${reportData.agenda.length}
+总超时项目: ${Object.values(timerRecords).filter(r => r.isOvertime).length}
+总哼哈词记录: ${Object.keys(fillerWordRecords).length}/${reportData.agenda.length}
+总哼哈词数量: ${Object.values(fillerWordRecords).reduce((sum: number, record: any) => sum + (record.totalCount || 0), 0)}
     `.trim();
 
     const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
@@ -280,398 +309,113 @@ ${item.isOvertime ? `超时: ${item.overtimeAmount}` : '按时完成'}
     );
   }
 
+  if (currentView === 'filler-tracker' && currentAgendaItem) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
+        <MeetingHeader
+          meeting={meetingData}
+          onBack={() => setCurrentView('dashboard')}
+          onImport={() => setIsImportDialogOpen(true)}
+          onExport={exportReport}
+        />
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <FillerWordTracker
+            agendaItem={currentAgendaItem}
+            onSaveRecord={handleFillerWordSave}
+            existingRecord={fillerWordRecords[currentAgendaItem.id]}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={onBack}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{meetingData.title}</h1>
-                <p className="text-sm text-gray-600">{meetingData.date} {meetingData.time}</p>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Button onClick={() => setIsImportDialogOpen(true)} variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Smart Import Agenda
-              </Button>
-              <Button onClick={exportReport} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MeetingHeader
+        meeting={meetingData}
+        onBack={onBack}
+        onImport={() => setIsImportDialogOpen(true)}
+        onExport={exportReport}
+      />
 
-      {/* Dashboard Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Agenda List */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Active Advanced Timers */}
-            {Array.from(activeTimers).map(timerId => {
-              const agendaItem = meetingData.agenda.find(item => item.id === timerId);
-              if (!agendaItem) return null;
-              
-              return (
-                <AdvancedTimer
-                  key={timerId}
-                  agendaItem={agendaItem}
-                  onComplete={(data) => handleTimerComplete(timerId, data)}
-                  onClose={() => handleTimerClose(timerId)}
-                />
-              );
-            })}
+          <div className="lg:col-span-2">
+            <AgendaList
+              agenda={meetingData.agenda}
+              activeTimers={activeTimers}
+              timerRecords={timerRecords}
+              editingItem={editingItem}
+              editingField={editingField}
+              editValue={editValue}
+              onStartTimer={handleStartTimer}
+              onStartEvaluation={handleStartEvaluation}
+              onTimerComplete={handleTimerComplete}
+              onTimerClose={handleTimerClose}
+              onAddAgenda={() => setIsAddDialogOpen(true)}
+              onDeleteItem={deleteAgendaItem}
+              onStartEditing={startEditing}
+              onSaveEdit={saveEdit}
+              onCancelEdit={cancelEdit}
+              onEditValueChange={handleDurationChange}
+              onTypeChange={handleTypeChange}
+              onUpdateAgenda={(newAgenda) => setMeetingData(prev => ({ ...prev, agenda: newAgenda }))}
+            />
 
-            {/* Agenda Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center">
-                    <Clock className="h-5 w-5 mr-2" />
-                    Meeting Agenda
-                  </CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddDialogOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Agenda
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {meetingData.agenda.map((item, index) => (
-                    <div key={item.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3 flex-1">
-                          <Badge variant="outline">#{index + 1}</Badge>
-                          
-                          {/* Editable Title */}
-                          {editingItem === item.id && editingField === 'title' ? (
-                            <div className="flex items-center gap-2 flex-1">
-                              <Input
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                className="flex-1"
-                                onBlur={saveEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveEdit();
-                                  if (e.key === 'Escape') cancelEdit();
-                                }}
-                                autoFocus
-                              />
-                              <Button size="sm" variant="ghost" onClick={saveEdit}>
-                                <Check className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                                <X className="h-3 w-3" />
-                              </Button>
+            {/* 哼哈词追踪区域 */}
+            {meetingData.agenda.length > 0 && (
+              <div className="mt-6">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-yellow-800 mb-3">哼哈官功能</h3>
+                  <p className="text-sm text-yellow-700 mb-4">
+                    点击下方按钮为演讲者记录哼哈词，帮助他们改善表达质量。
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {meetingData.agenda.map(item => (
+                      <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded border border-yellow-200">
+                        <div>
+                          <div className="font-medium text-sm">{item.title}</div>
+                          <div className="text-xs text-gray-600">{item.speaker || '未指定演讲者'}</div>
+                          {fillerWordRecords[item.id] && (
+                            <div className="text-xs text-yellow-700 mt-1">
+                              已记录 {fillerWordRecords[item.id].totalCount || 0} 个哼哈词
                             </div>
-                          ) : (
-                            <h3 
-                              className="font-medium cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1 flex-1"
-                              onClick={() => startEditing(item.id, 'title', item.title)}
-                            >
-                              {item.title}
-                              <Edit2 className="h-3 w-3 opacity-50" />
-                            </h3>
-                          )}
-
-                          {/* Editable Speaker */}
-                          {editingItem === item.id && editingField === 'speaker' ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                className="w-24"
-                                placeholder="Speaker"
-                                onBlur={saveEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveEdit();
-                                  if (e.key === 'Escape') cancelEdit();
-                                }}
-                                autoFocus
-                              />
-                              <Button size="sm" variant="ghost" onClick={saveEdit}>
-                                <Check className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : item.speaker ? (
-                            <Badge 
-                              variant="secondary" 
-                              className="cursor-pointer hover:bg-gray-200 flex items-center gap-1"
-                              onClick={() => startEditing(item.id, 'speaker', item.speaker || '')}
-                            >
-                              {item.speaker}
-                              <Edit2 className="h-3 w-3 opacity-50" />
-                            </Badge>
-                          ) : (
-                            <span 
-                              className="text-sm text-gray-500 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
-                              onClick={() => startEditing(item.id, 'speaker', '')}
-                            >
-                              + Add Speaker
-                              <Edit2 className="h-3 w-3 opacity-50" />
-                            </span>
                           )}
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          {/* Editable Duration */}
-                          {editingItem === item.id && editingField === 'duration' ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="text"
-                                value={editValue}
-                                onChange={(e) => handleDurationChange(e.target.value)}
-                                className="w-16"
-                                onBlur={saveEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveEdit();
-                                  if (e.key === 'Escape') cancelEdit();
-                                }}
-                                autoFocus
-                                placeholder="1"
-                              />
-                              <span className="text-sm text-gray-500">min</span>
-                              <Button size="sm" variant="ghost" onClick={saveEdit}>
-                                <Check className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <span 
-                              className="text-sm text-gray-500 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
-                              onClick={() => startEditing(item.id, 'duration', item.duration)}
-                            >
-                              {formatTime(item.duration)}
-                              <Edit2 className="h-3 w-3 opacity-50" />
-                            </span>
-                          )}
-                          
-                          {timerRecords[item.id] && (
-                            <Badge variant={timerRecords[item.id].isOvertime ? "destructive" : "default"}>
-                              {timerRecords[item.id].isOvertime ? "Overtime" : "On Time"}
-                            </Badge>
-                          )}
-                          {activeTimers.has(item.id) && (
-                            <Badge className="bg-blue-500 text-white animate-pulse">
-                              Timing
-                            </Badge>
-                          )}
-                          
-                          {/* Delete Button */}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => deleteAgendaItem(item.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span>Type:</span>
-                            {/* Editable Type */}
-                            {editingItem === item.id && editingField === 'type' ? (
-                              <div className="flex items-center gap-2">
-                                <Select value={editValue} onValueChange={(value) => handleTypeChange(item.id, value)}>
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="speech">Speech</SelectItem>
-                                    <SelectItem value="evaluation">Evaluation</SelectItem>
-                                    <SelectItem value="table-topics">Table Topics</SelectItem>
-                                    <SelectItem value="break">Break</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <span 
-                                className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded flex items-center gap-1"
-                                onClick={() => startEditing(item.id, 'type', item.type)}
-                              >
-                                {getTypeDisplayName(item.type)}
-                                <Edit2 className="h-3 w-3 opacity-50" />
-                              </span>
-                            )}
-                          </div>
-                          {timerRecords[item.id] && (
-                            <div>Actual Duration: {formatTime(timerRecords[item.id].actualDuration)}</div>
-                          )}
-                        </div>
-                        
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleStartTimer(item.id)}
-                            className="bg-blue-600 hover:bg-blue-700"
-                            disabled={activeTimers.has(item.id)}
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            {activeTimers.has(item.id) ? 'Timing' : 'Smart Timer'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStartEvaluation(item.id)}
-                          >
-                            <FileText className="h-3 w-3 mr-1" />
-                            Evaluate
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Empty State */}
-                  {meetingData.agenda.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <p className="mb-4">No agenda items yet</p>
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => addNewAgendaItem('speech')}
+                        <button
+                          onClick={() => handleStartFillerTracker(item.id)}
+                          className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 transition-colors"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Speech Item
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsImportDialogOpen(true)}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Batch Import
-                        </Button>
+                          {fillerWordRecords[item.id] ? '编辑记录' : '开始记录'}
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
-            {/* Timer Report */}
             {Object.keys(timerRecords).length > 0 && (
-              <TimerReport 
-                agenda={meetingData.agenda}
-                timerRecords={timerRecords}
-              />
+              <div className="mt-6">
+                <TimerReport 
+                  agenda={meetingData.agenda}
+                  timerRecords={timerRecords}
+                />
+              </div>
             )}
           </div>
 
-          {/* Summary Panel */}
-          <div className="space-y-6">
-            {/* Time Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Time Statistics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Planned Total Duration</span>
-                    <span className="font-medium">
-                      {formatTime(meetingData.agenda.reduce((sum, item) => sum + item.duration, 0))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Recorded Items</span>
-                    <span className="font-medium">
-                      {Object.keys(timerRecords).length}/{meetingData.agenda.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Overtime Items</span>
-                    <span className="font-medium text-red-600">
-                      {Object.values(timerRecords).filter(record => record.isOvertime).length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Active Timers</span>
-                    <span className="font-medium text-blue-600">
-                      {activeTimers.size}
-                    </span>
-                  </div>
-                  {Object.keys(timerRecords).length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Actual Duration Statistics</h4>
-                      <div className="text-sm text-gray-600">
-                        Total Actual Duration: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.actualDuration, 0))}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Total Overtime: {formatTime(Object.values(timerRecords).reduce((sum, record) => sum + record.overtimeAmount, 0))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Evaluation Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Evaluation Statistics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Completed Evaluations</span>
-                    <span className="font-medium">
-                      {Object.keys(evaluations).length}/{meetingData.agenda.length}
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Completion Rate: {Math.round((Object.keys(evaluations).length / meetingData.agenda.length) * 100)}%
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <Button className="w-full" variant="outline" onClick={() => addNewAgendaItem('speech')}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add New Agenda Item
-                  </Button>
-                  <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Smart Import Agenda
-                  </Button>
-                  <Button className="w-full" variant="outline" onClick={exportReport}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Meeting Report
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <div>
+            <MeetingSummary
+              agenda={meetingData.agenda}
+              timerRecords={timerRecords}
+              evaluations={evaluations}
+              fillerWordRecords={fillerWordRecords}
+              activeTimers={activeTimers}
+              onAddAgenda={() => setIsAddDialogOpen(true)}
+              onImportAgenda={() => setIsImportDialogOpen(true)}
+              onExportReport={exportReport}
+            />
           </div>
         </div>
       </main>
