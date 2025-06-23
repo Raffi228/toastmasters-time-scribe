@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { parseAgendaText, validateAgendaItems, type ParsedAgendaItem } from './import/AgendaParser';
 import AgendaPreview from './import/AgendaPreview';
 import ImportExamples from './import/ImportExamples';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ImportAgendaDialogProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
   onClose,
   onImport
 }) => {
+  const { t } = useLanguage();
   const [inputText, setInputText] = useState('');
   const [parsedItems, setParsedItems] = useState<ParsedAgendaItem[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -63,61 +65,69 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            智能导入议程
+            {t('import.title') || '智能导入议程'}
           </DialogTitle>
           <DialogDescription>
-            支持复制粘贴表格数据，自动识别时间、项目、时长、演讲者等信息
+            {t('import.description') || '支持复制粘贴表格数据，自动识别时间、项目、时长、演讲者等信息'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full p-6">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
             {/* 左侧：输入区域 */}
-            <div className="flex flex-col space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col p-6 min-h-0">
+              <div className="flex items-center gap-2 mb-4 shrink-0">
                 <FileText className="h-4 w-4" />
-                <Label htmlFor="agenda-text" className="text-base font-medium">议程文本</Label>
+                <Label htmlFor="agenda-text" className="text-base font-medium">
+                  {t('import.agendaText') || '议程文本'}
+                </Label>
               </div>
               
-              <Textarea
-                id="agenda-text"
-                placeholder="请粘贴议程文本，支持表格格式：
+              <div className="flex-1 min-h-0 flex flex-col space-y-4">
+                <Textarea
+                  id="agenda-text"
+                  placeholder={t('import.placeholder') || `请粘贴议程文本，支持表格格式：
 
 时间	项目	时长	演讲者
 19:00	开场致辞	3'	张主席
 19:05	备稿演讲	5-7'	李演讲者
-..."
-                value={inputText}
-                onChange={(e) => handleTextChange(e.target.value)}
-                className="flex-1 min-h-[300px] font-mono text-sm resize-none"
-              />
+...`}
+                  value={inputText}
+                  onChange={(e) => handleTextChange(e.target.value)}
+                  className="flex-1 min-h-[200px] font-mono text-sm resize-none"
+                />
 
-              <ImportExamples onUseExample={handleUseExample} />
+                <div className="shrink-0">
+                  <ImportExamples onUseExample={handleUseExample} />
+                </div>
+              </div>
             </div>
 
             {/* 右侧：预览区域 */}
-            <div className="flex flex-col">
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4">
-                  <AgendaPreview items={parsedItems} errors={errors} />
-                </div>
-              </ScrollArea>
+            <div className="flex flex-col p-6 border-l min-h-0">
+              <div className="flex-1 min-h-0">
+                <ScrollArea className="h-full">
+                  <div className="pr-4">
+                    <AgendaPreview items={parsedItems} errors={errors} />
+                  </div>
+                </ScrollArea>
+              </div>
               
               {parsedItems.length > 0 && (
-                <div className="flex justify-end space-x-2 pt-4 border-t mt-4">
+                <div className="flex justify-end space-x-2 pt-4 border-t mt-4 shrink-0">
                   <Button variant="outline" onClick={handleClose}>
-                    取消
+                    {t('button.cancel') || '取消'}
                   </Button>
                   <Button 
                     onClick={handleImport}
                     disabled={errors.length > 0 || parsedItems.length === 0}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    导入 {parsedItems.length} 项
+                    {t('import.importItems') || `导入 ${parsedItems.length} 项`}
                   </Button>
                 </div>
               )}

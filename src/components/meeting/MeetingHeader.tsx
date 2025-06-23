@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Upload, Download } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface MeetingHeaderProps {
   meeting: {
@@ -20,6 +21,8 @@ const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   onImport,
   onExport
 }) => {
+  const { t } = useLanguage();
+
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -27,7 +30,7 @@ const MeetingHeader: React.FC<MeetingHeaderProps> = ({
           <div className="flex items-center space-x-4">
             <Button variant="ghost" onClick={onBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              {t('button.back') || 'Back'}
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{meeting.title}</h1>
@@ -37,11 +40,11 @@ const MeetingHeader: React.FC<MeetingHeaderProps> = ({
           <div className="flex space-x-2">
             <Button onClick={onImport} variant="outline">
               <Upload className="h-4 w-4 mr-2" />
-              Smart Import Agenda
+              {t('import.title') || 'Smart Import Agenda'}
             </Button>
             <Button onClick={onExport} variant="outline">
               <Download className="h-4 w-4 mr-2" />
-              Export Report
+              {t('button.exportReport') || 'Export Report'}
             </Button>
           </div>
         </div>
