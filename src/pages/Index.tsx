@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,67 +8,37 @@ import CreateMeetingDialog from '@/components/CreateMeetingDialog';
 import MeetingDashboard from '@/components/MeetingDashboard';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-interface Meeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  status: 'upcoming' | 'active' | 'completed';
-  agenda: Array<{
-    id: string;
-    title: string;
-    duration: number;
-    type: 'speech' | 'evaluation' | 'table-topics' | 'break';
-    speaker?: string;
-  }>;
-}
+import { useMeetings } from '@/hooks/useMeetings';
 
 const Index = () => {
   const { t } = useLanguage();
+  const { meetings, loading, createMeeting } = useMeetings();
   
-  const [meetings, setMeetings] = useState<Meeting[]>([
-    {
-      id: '1',
-      title: '第158次例会',
-      date: '2025-06-15',
-      time: '14:00',
-      status: 'active',
-      agenda: [
-        { id: '1', title: '备稿演讲 - 演讲的力量', duration: 420, type: 'speech', speaker: '张三' },
-        { id: '2', title: '点评环节', duration: 180, type: 'evaluation' },
-        { id: '3', title: '即兴演讲', duration: 120, type: 'table-topics' },
-      ]
-    },
-    {
-      id: '2',
-      title: '第159次例会',
-      date: '2025-06-22',
-      time: '14:00',
-      status: 'upcoming',
-      agenda: []
-    }
-  ]);
-
   const [currentView, setCurrentView] = useState<'home' | 'meeting'>('home');
-  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<any>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  const handleCreateMeeting = (meetingData: Omit<Meeting, 'id' | 'status'>) => {
-    const newMeeting: Meeting = {
-      ...meetingData,
-      id: Date.now().toString(),
-      status: 'upcoming'
-    };
-    setMeetings([...meetings, newMeeting]);
+  const handleCreateMeeting = async (meetingData: {
+    title: string;
+    date: string;
+    time: string;
+    agenda: any[];
+  }) => {
+    try {
+      await createMeeting(meetingData);
+      setIsCreateDialogOpen(false);
+    } catch (error) {
+      console.error('创建会议失败:', error);
+      // 可以添加错误提示
+    }
   };
 
-  const handleEnterMeeting = (meeting: Meeting) => {
+  const handleEnterMeeting = (meeting: any) => {
     setSelectedMeeting(meeting);
     setCurrentView('meeting');
   };
 
-  const getStatusColor = (status: Meeting['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
         return 'bg-green-500';
@@ -80,7 +51,7 @@ const Index = () => {
     }
   };
 
-  const getStatusText = (status: Meeting['status']) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'active':
         return '进行中';
@@ -99,6 +70,17 @@ const Index = () => {
         meeting={selectedMeeting} 
         onBack={() => setCurrentView('home')} 
       />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
     );
   }
 
@@ -141,7 +123,7 @@ const Index = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4</div>
+              <div className="text-2xl font-bold">{meetings.length}</div>
               <p className="text-xs text-muted-foreground">{t('stats.monthlyMeetings.change')}</p>
             </CardContent>
           </Card>
@@ -180,7 +162,7 @@ const Index = () => {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{meeting.title}</CardTitle>
                     <Badge className={`${getStatusColor(meeting.status)} text-white`}>
-                      {t(`status.${meeting.status}`)}
+                      {t(`status.${meeting.status}`) || getStatusText(meeting.status)}
                     </Badge>
                   </div>
                   <CardDescription>
@@ -213,6 +195,22 @@ const Index = () => {
               </Card>
             ))}
           </div>
+
+          {/* Empty State */}
+          {meetings.length === 0 && (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">暂无会议</h3>
+              <p className="text-gray-600 mb-4">创建您的第一个会议开始使用</p>
+              <Button 
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                创建会议
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 

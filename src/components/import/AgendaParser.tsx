@@ -6,6 +6,7 @@ export interface ParsedAgendaItem {
   duration: number;
   type: 'speech' | 'evaluation' | 'table-topics' | 'break';
   speaker?: string;
+  scheduledTime?: string; // 新增：计划开始时间
 }
 
 // 将计时器类型映射到议程类型
@@ -18,6 +19,22 @@ const mapTimerTypeToAgendaType = (timerType: AgendaType): 'speech' | 'evaluation
     case 'other': return 'break';
     default: return 'break';
   }
+};
+
+// 解析时间字符串（支持 HH:MM 和 HH:MM:SS 格式）
+const parseTimeString = (timeStr: string): string | undefined => {
+  if (!timeStr) return undefined;
+  
+  // 匹配各种时间格式
+  const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = timeMatch[1].padStart(2, '0');
+    const minutes = timeMatch[2];
+    const seconds = timeMatch[3] || '00';
+    return `${hours}:${minutes}:${seconds}`;
+  }
+  
+  return undefined;
 };
 
 export const parseAgendaText = (text: string): ParsedAgendaItem[] => {
@@ -36,9 +53,13 @@ export const parseAgendaText = (text: string): ParsedAgendaItem[] => {
     const parts = line.split(/\t|	/).map(part => part.trim()).filter(part => part);
     
     if (parts.length >= 3) {
+      const timeStr = parts[0] || '';
       const title = parts[1] || '';
       const durationStr = parts[2] || '';
       const speaker = parts[3] || '';
+      
+      // 解析计划时间
+      const scheduledTime = parseTimeString(timeStr);
       
       // 解析时长
       let duration = 300; // 默认5分钟
@@ -60,7 +81,8 @@ export const parseAgendaText = (text: string): ParsedAgendaItem[] => {
         title: title.trim(),
         duration,
         type: agendaType,
-        speaker: speaker.trim() || undefined
+        speaker: speaker.trim() || undefined,
+        scheduledTime
       });
     }
   }

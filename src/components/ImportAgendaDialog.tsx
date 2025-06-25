@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Copy, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Copy, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { parseAgendaText, validateAgendaItems, type ParsedAgendaItem } from './import/AgendaParser';
@@ -254,6 +254,12 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
                                 {getTypeDisplayName(item.type)}
                               </Badge>
                               <span className="font-medium text-gray-900">{item.title}</span>
+                              {item.scheduledTime && (
+                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {item.scheduledTime}
+                                </Badge>
+                              )}
                             </div>
                             {item.speaker && (
                               <div className="text-sm text-gray-600">

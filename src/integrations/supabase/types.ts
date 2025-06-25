@@ -9,7 +9,130 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      agenda_items: {
+        Row: {
+          actual_end_time: string | null
+          actual_start_time: string | null
+          created_at: string
+          duration: number
+          id: string
+          meeting_id: string
+          order_index: number
+          scheduled_time: string | null
+          speaker: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          actual_end_time?: string | null
+          actual_start_time?: string | null
+          created_at?: string
+          duration: number
+          id?: string
+          meeting_id: string
+          order_index?: number
+          scheduled_time?: string | null
+          speaker?: string | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          actual_end_time?: string | null
+          actual_start_time?: string | null
+          created_at?: string
+          duration?: number
+          id?: string
+          meeting_id?: string
+          order_index?: number
+          scheduled_time?: string | null
+          speaker?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_items_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetings: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          status: string | null
+          time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          status?: string | null
+          time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          status?: string | null
+          time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      timer_records: {
+        Row: {
+          actual_duration: number
+          agenda_item_id: string
+          created_at: string
+          ended_at: string
+          id: string
+          is_overtime: boolean
+          overtime_amount: number | null
+          started_at: string
+        }
+        Insert: {
+          actual_duration: number
+          agenda_item_id: string
+          created_at?: string
+          ended_at: string
+          id?: string
+          is_overtime?: boolean
+          overtime_amount?: number | null
+          started_at: string
+        }
+        Update: {
+          actual_duration?: number
+          agenda_item_id?: string
+          created_at?: string
+          ended_at?: string
+          id?: string
+          is_overtime?: boolean
+          overtime_amount?: number | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timer_records_agenda_item_id_fkey"
+            columns: ["agenda_item_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

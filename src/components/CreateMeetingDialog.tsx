@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Upload, GripVertical, Edit2, Check, X, RefreshCw, Undo2 } from 'lucide-react';
+import { Plus, Trash2, Upload, GripVertical, Edit2, Check, X, RefreshCw, Undo2, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ImportAgendaDialog from './ImportAgendaDialog';
 
@@ -15,6 +16,7 @@ interface AgendaItem {
   duration: number;
   type: 'speech' | 'evaluation' | 'table-topics' | 'break';
   speaker?: string;
+  scheduledTime?: string; // 新增：计划开始时间
 }
 
 interface CreateMeetingDialogProps {
@@ -243,7 +245,7 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                 <Check className="h-4 w-4 text-green-600" />
                 <AlertDescription className="flex items-center justify-between">
                   <span className="text-green-800">
-                    成功导入 {lastImportedAgenda.length} 个议程项目
+                    成功导入 {lastImportedAgenda.length} 个议程项目（包含时间信息）
                   </span>
                   <Button
                     variant="ghost"
@@ -329,6 +331,12 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                         <div className="flex items-center gap-2">
                           <GripVertical className="h-4 w-4 text-gray-400 cursor-grab" />
                           <CardTitle className="text-sm">议程项目 {index + 1}</CardTitle>
+                          {item.scheduledTime && (
+                            <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              <Clock className="h-3 w-3" />
+                              {item.scheduledTime}
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-1">
                           {editingItem === item.id ? (
@@ -388,7 +396,7 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                             />
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <div>
                               <Label>类型</Label>
                               <Select
@@ -416,6 +424,16 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                                 placeholder="分钟"
                               />
                             </div>
+
+                            <div>
+                              <Label>计划时间</Label>
+                              <Input
+                                type="time"
+                                value={editForm.scheduledTime || ''}
+                                onChange={(e) => setEditForm({ ...editForm, scheduledTime: e.target.value })}
+                                placeholder="HH:MM"
+                              />
+                            </div>
                           </div>
 
                           <div>
@@ -438,6 +456,7 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
                             <div className="text-sm text-gray-600">
                               {getTypeDisplayName(item.type)} • {formatDuration(item.duration)}
                               {item.speaker && ` • ${item.speaker}`}
+                              {item.scheduledTime && ` • 计划时间: ${item.scheduledTime}`}
                             </div>
                           </div>
                         </div>
