@@ -7,6 +7,7 @@ import MeetingHeader from '@/components/meeting/MeetingHeader';
 import AgendaList from '@/components/meeting/AgendaList';
 import MeetingSummary from '@/components/meeting/MeetingSummary';
 import FillerWordTracker from '@/components/meeting/FillerWordTracker';
+import TimeEditor from '@/components/timer/TimeEditor';
 
 interface Meeting {
   id: string;
@@ -20,6 +21,7 @@ interface Meeting {
     duration: number;
     type: 'speech' | 'evaluation' | 'table-topics' | 'break';
     speaker?: string;
+    scheduledTime?: string;
   }>;
 }
 
@@ -152,8 +154,8 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setEditingItem(itemId);
     setEditingField(field);
     if (field === 'duration') {
-      const minutes = Math.round(Number(currentValue) / 60);
-      setEditValue(minutes.toString());
+      // 不需要预处理，直接传递分钟数
+      setEditValue(Math.round(Number(currentValue) / 60).toString());
     } else {
       setEditValue(String(currentValue || ''));
     }
@@ -171,7 +173,6 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
           } else if (editingField === 'speaker') {
             return { ...item, speaker: editValue };
           } else if (editingField === 'duration') {
-            // 在保存时限制时长在1-60分钟之间，空值默认为1
             const minutes = Math.max(1, Math.min(60, parseInt(editValue) || 1));
             return { ...item, duration: minutes * 60 };
           } else if (editingField === 'type') {
@@ -185,9 +186,20 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     cancelEdit();
   };
 
-  const handleDurationChange = (value: string) => {
-    // 完全允许空值和任何数字输入，不做任何限制
-    setEditValue(value);
+  const handleDurationChange = (minutes: number) => {
+    if (!editingItem) return;
+    
+    setMeetingData(prev => ({
+      ...prev,
+      agenda: prev.agenda.map(item => {
+        if (item.id === editingItem) {
+          return { ...item, duration: minutes * 60 };
+        }
+        return item;
+      })
+    }));
+    
+    cancelEdit();
   };
 
   const handleTypeChange = (itemId: string, newType: string) => {
@@ -357,9 +369,16 @@ ${item.fillerWords ? `
               onStartEditing={startEditing}
               onSaveEdit={saveEdit}
               onCancelEdit={cancelEdit}
-              onEditValueChange={handleDurationChange}
+              onEditValueChange={setEditValue}
               onTypeChange={handleTypeChange}
               onUpdateAgenda={(newAgenda) => setMeetingData(prev => ({ ...prev, agenda: newAgenda }))}
+              TimeEditor={editingField === 'duration' ? 
+                <TimeEditor
+                  value={parseInt(editValue) || 1}
+                  onChange={handleDurationChange}
+                  onCancel={cancelEdit}
+                /> : undefined
+              }
             />
 
             {/* 哼哈词追踪区域 */}

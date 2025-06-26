@@ -62,7 +62,11 @@ export const useMeetings = () => {
           if (agendaError) {
             console.error('获取议程出错:', agendaError);
             return {
-              ...meeting,
+              id: meeting.id,
+              title: meeting.title,
+              date: meeting.date,
+              time: meeting.time,
+              status: (meeting.status || 'upcoming') as Meeting['status'],
               agenda: []
             };
           }
@@ -84,7 +88,7 @@ export const useMeetings = () => {
             title: meeting.title,
             date: meeting.date,
             time: meeting.time,
-            status: meeting.status as Meeting['status'],
+            status: (meeting.status || 'upcoming') as Meeting['status'],
             agenda
           };
         })
