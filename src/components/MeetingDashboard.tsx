@@ -372,14 +372,21 @@ ${item.fillerWords ? `
               onEditValueChange={setEditValue}
               onTypeChange={handleTypeChange}
               onUpdateAgenda={(newAgenda) => setMeetingData(prev => ({ ...prev, agenda: newAgenda }))}
-              TimeEditor={editingField === 'duration' ? 
-                <TimeEditor
-                  value={parseInt(editValue) || 1}
-                  onChange={handleDurationChange}
-                  onCancel={cancelEdit}
-                /> : undefined
-              }
             />
+
+            {/* 时间编辑器 */}
+            {editingField === 'duration' && editingItem && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                  <h3 className="text-lg font-semibold mb-4">编辑时长</h3>
+                  <TimeEditor
+                    value={parseInt(editValue) || 1}
+                    onChange={handleDurationChange}
+                    onCancel={cancelEdit}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* 哼哈词追踪区域 */}
             {meetingData.agenda.length > 0 && (

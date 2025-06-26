@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Check, X, Edit2 } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 interface TimeEditorProps {
   value: number; // 时长（分钟）
@@ -13,7 +13,6 @@ interface TimeEditorProps {
 
 const TimeEditor: React.FC<TimeEditorProps> = ({ value, onChange, onCancel, className = '' }) => {
   const [inputValue, setInputValue] = useState(value.toString());
-  const [isEmpty, setIsEmpty] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -25,8 +24,10 @@ const TimeEditor: React.FC<TimeEditorProps> = ({ value, onChange, onCancel, clas
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    setInputValue(newValue);
-    setIsEmpty(newValue === '');
+    // 只允许数字输入，允许空字符串
+    if (newValue === '' || /^\d+$/.test(newValue)) {
+      setInputValue(newValue);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -38,14 +39,13 @@ const TimeEditor: React.FC<TimeEditorProps> = ({ value, onChange, onCancel, clas
   };
 
   const handleSave = () => {
-    let finalValue = isEmpty ? 1 : parseInt(inputValue) || 1;
-    finalValue = Math.max(1, Math.min(60, finalValue)); // 限制在1-60分钟之间
+    // 如果输入为空或无效，默认为1分钟
+    const finalValue = inputValue === '' ? 1 : Math.max(1, Math.min(60, parseInt(inputValue) || 1));
     onChange(finalValue);
   };
 
   const handleClear = () => {
     setInputValue('');
-    setIsEmpty(true);
     if (inputRef.current) {
       inputRef.current.focus();
     }
