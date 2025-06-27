@@ -78,12 +78,13 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const [isEditingDuration, setIsEditingDuration] = useState(false);
   const [isEditingSpeaker, setIsEditingSpeaker] = useState(false);
   const [editTitle, setEditTitle] = useState(agendaItem.title);
-  const [editDuration, setEditDuration] = useState(Math.round(agendaItem.duration / 60));
+  const [editDuration, setEditDuration] = useState('');
   const [editSpeaker, setEditSpeaker] = useState(agendaItem.speaker || '');
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const personalIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
+  const durationInputRef = useRef<HTMLInputElement>(null);
 
   // 检查是否为即兴演讲环节
   useEffect(() => {
@@ -286,7 +287,8 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   };
 
   const handleDurationEdit = () => {
-    const newDuration = editDuration * 60;
+    const minutes = editDuration === '' ? 1 : Math.max(1, Math.min(60, parseInt(editDuration) || 1));
+    const newDuration = minutes * 60;
     setOriginalDuration(newDuration);
     if (!hasStarted) {
       setTimeRemaining(newDuration);
@@ -318,6 +320,41 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         speaker: editSpeaker,
         type: currentType
       });
+    }
+  };
+
+  const startDurationEdit = () => {
+    setEditDuration(Math.round(originalDuration / 60).toString());
+    setIsEditingDuration(true);
+    // 下一帧聚焦并选中文本
+    setTimeout(() => {
+      if (durationInputRef.current) {
+        durationInputRef.current.focus();
+        durationInputRef.current.select();
+      }
+    }, 0);
+  };
+
+  const handleDurationInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    // 只允许数字输入，允许空字符串
+    if (newValue === '' || /^\d+$/.test(newValue)) {
+      setEditDuration(newValue);
+    }
+  };
+
+  const handleDurationKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleDurationEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditingDuration(false);
+    }
+  };
+
+  const clearDurationInput = () => {
+    setEditDuration('');
+    if (durationInputRef.current) {
+      durationInputRef.current.focus();
     }
   };
 
@@ -437,24 +474,39 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
               {isEditingDuration ? (
                 <div className="flex items-center gap-2">
                   <span className={`text-sm ${getTextColor()} opacity-80`}>总时长:</span>
-                  <Input
-                    type="number"
-                    value={editDuration}
-                    onChange={(e) => setEditDuration(parseInt(e.target.value) || 1)}
-                    className="w-16 h-6 text-xs bg-white/20 border-white/30"
-                    onBlur={handleDurationEdit}
-                    onKeyPress={(e) => e.key === 'Enter' && handleDurationEdit()}
-                    autoFocus
-                  />
+                  <div className="relative">
+                    <Input
+                      ref={durationInputRef}
+                      type="text"
+                      value={editDuration}
+                      onChange={handleDurationInputChange}
+                      onKeyDown={handleDurationKeyPress}
+                      onBlur={handleDurationEdit}
+                      className="w-16 h-6 text-xs bg-white/20 border-white/30 text-center"
+                      placeholder="分钟"
+                    />
+                    {editDuration && (
+                      <button
+                        onClick={clearDurationInput}
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                   <span className={`text-sm ${getTextColor()} opacity-80`}>分钟</span>
                   <Button size="sm" variant="ghost" onClick={handleDurationEdit} className={getTextColor()}>
                     <Check className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsEditingDuration(false)} className={getTextColor()}>
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               ) : (
                 <div 
                   className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
-                  onClick={() => setIsEditingDuration(true)}
+                  onClick={startDurationEdit}
                 >
                   总时长: {formatTime(originalDuration)}
                   <Edit2 className="h-3 w-3 opacity-50" />
