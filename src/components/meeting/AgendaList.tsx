@@ -14,6 +14,7 @@ interface AgendaItem {
   duration: number;
   type: 'speech' | 'evaluation' | 'table-topics' | 'break';
   speaker?: string;
+  scheduledTime?: string;
 }
 
 interface AgendaListProps {
@@ -194,6 +195,14 @@ const AgendaList: React.FC<AgendaListProps> = ({
                         + Add Speaker
                         <Edit2 className="h-3 w-3 opacity-50" />
                       </span>
+                    )}
+
+                    {/* Scheduled Time Display */}
+                    {item.scheduledTime && (
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {item.scheduledTime}
+                      </Badge>
                     )}
                   </div>
                   
