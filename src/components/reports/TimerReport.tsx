@@ -2,9 +2,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Target, BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Clock, Target, TrendingUp, Download } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 
 interface TimerReportProps {
   agenda: Array<{
@@ -88,32 +88,106 @@ const TimerReport: React.FC<TimerReportProps> = ({ agenda, timerRecords }) => {
   const analysis = getTimeAnalysis();
   const structureAnalysis = getStructureAnalysis();
 
-  // 图表数据
-  const chartData = structureAnalysis.map(item => ({
-    name: item.speaker || item.title.substring(0, 8) + '...',
-    实际用时: Math.round(item.record.actualDuration / 60 * 10) / 10,
-    计划用时: Math.round(item.duration / 60 * 10) / 10,
-    usage: item.usage
+  // 热力图数据
+  const heatmapData = structureAnalysis.map((item, index) => ({
+    id: item.id,
+    name: item.speaker || `演讲者${index + 1}`,
+    title: item.title.length > 10 ? item.title.substring(0, 10) + '...' : item.title,
+    planned: Math.round(item.duration / 60),
+    actual: Math.round(item.record.actualDuration / 60),
+    usage: item.usage,
+    status: item.usage > 1.1 ? 'overtime' : item.usage < 0.8 ? 'undertime' : 'ontime'
   }));
 
-  const chartConfig = {
-    实际用时: {
-      label: "实际用时 (分钟)",
-      color: "hsl(var(--chart-1))",
-    },
-    计划用时: {
-      label: "计划用时 (分钟)", 
-      color: "hsl(var(--chart-2))",
-    },
+  // 导出热力图
+  const exportHeatmap = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = 800;
+    canvas.height = 600;
+    
+    // 背景
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 标题
+    ctx.fillStyle = '#000000';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('时间官报告热力图', canvas.width / 2, 40);
+    
+    // 绘制热力图
+    const cellWidth = 120;
+    const cellHeight = 60;
+    const startX = 50;
+    const startY = 80;
+    const cols = Math.ceil(Math.sqrt(heatmapData.length));
+    
+    heatmapData.forEach((item, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const x = startX + col * (cellWidth + 10);
+      const y = startY + row * (cellHeight + 10);
+      
+      // 根据用时情况设置颜色
+      if (item.status === 'overtime') {
+        ctx.fillStyle = '#ef4444'; // 红色
+      } else if (item.status === 'undertime') {
+        ctx.fillStyle = '#3b82f6'; // 蓝色
+      } else {
+        ctx.fillStyle = '#22c55e'; // 绿色
+      }
+      
+      ctx.fillRect(x, y, cellWidth, cellHeight);
+      
+      // 文字
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.name, x + cellWidth / 2, y + 20);
+      ctx.fillText(`${item.actual}/${item.planned}分钟`, x + cellWidth / 2, y + 35);
+      ctx.fillText(`${Math.round(item.usage * 100)}%`, x + cellWidth / 2, y + 50);
+    });
+    
+    // 图例
+    const legendY = startY + Math.ceil(heatmapData.length / cols) * (cellHeight + 10) + 30;
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(startX, legendY, 20, 20);
+    ctx.fillStyle = '#000000';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('准时 (80%-110%)', startX + 30, legendY + 15);
+    
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(startX + 150, legendY, 20, 20);
+    ctx.fillText('用时不足 (<80%)', startX + 180, legendY + 15);
+    
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(startX + 300, legendY, 20, 20);
+    ctx.fillText('超时 (>110%)', startX + 330, legendY + 15);
+    
+    // 下载
+    const link = document.createElement('a');
+    link.download = '时间官报告热力图.png';
+    link.href = canvas.toDataURL();
+    link.click();
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Clock className="h-5 w-5 mr-2" />
-          时间官报告
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center">
+            <Clock className="h-5 w-5 mr-2" />
+            时间官报告
+          </CardTitle>
+          <Button onClick={exportHeatmap} size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Download className="h-4 w-4 mr-2" />
+            导出热力图
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* 全场用时情况分析 */}
@@ -134,31 +208,52 @@ const TimerReport: React.FC<TimerReportProps> = ({ agenda, timerRecords }) => {
           </div>
         </div>
 
-        {/* 用时情况统计图表 */}
+        {/* 用时情况热力图 */}
         <div>
           <h4 className="font-semibold mb-3 flex items-center">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            用时情况统计图表
+            <TrendingUp className="h-4 w-4 mr-2" />
+            用时情况热力图
           </h4>
-          {chartData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="计划用时" fill="var(--color-计划用时)" />
-                <Bar dataKey="实际用时" fill="var(--color-实际用时)">
-                  {chartData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.usage > 1.1 ? "hsl(var(--destructive))" : 
-                            entry.usage < 0.8 ? "hsl(var(--muted-foreground))" : 
-                            "var(--color-实际用时)"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
+          {heatmapData.length > 0 ? (
+            <div>
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {heatmapData.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${
+                      item.status === 'overtime' 
+                        ? 'bg-red-100 border-red-300 text-red-800' 
+                        : item.status === 'undertime'
+                        ? 'bg-blue-100 border-blue-300 text-blue-800'
+                        : 'bg-green-100 border-green-300 text-green-800'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm mb-1">{item.name}</div>
+                    <div className="text-xs text-gray-600 mb-2">{item.title}</div>
+                    <div className="text-lg font-bold">{item.actual}/{item.planned}分钟</div>
+                    <div className="text-sm">
+                      {Math.round(item.usage * 100)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* 图例 */}
+              <div className="flex justify-center gap-6 text-sm">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                  <span>准时 (80%-110%)</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                  <span>用时不足 (&lt;80%)</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                  <span>超时 (&gt;110%)</span>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <p>暂无计时数据</p>

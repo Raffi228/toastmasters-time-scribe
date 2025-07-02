@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X, Clock, Minimize2, Maximize2, Move } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
 import CurrentTime from '@/components/CurrentTime';
 
@@ -69,6 +69,13 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     PRESET_RULES[mapAgendaTypeToTimerType(agendaItem.type)]
   );
   
+  // 浮窗相关状态
+  const [isFloating, setIsFloating] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [position, setPosition] = useState({ x: 20, y: 20 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
   // 即兴演讲个人计时器
   const [isTableTopics, setIsTableTopics] = useState(false);
   const [personalTimers, setPersonalTimers] = useState<PersonalTimer[]>([]);
@@ -86,6 +93,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const personalIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const durationInputRef = useRef<HTMLInputElement>(null);
+  const floatingRef = useRef<HTMLDivElement>(null);
 
   // 检查是否为即兴演讲环节
   useEffect(() => {
@@ -226,6 +234,10 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const handleStart = () => {
     setIsRunning(true);
     setHasStarted(true);
+    // 开始计时时自动切换到浮窗模式
+    if (!isFloating) {
+      setIsFloating(true);
+    }
   };
 
   const handlePause = () => {
@@ -439,12 +451,83 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     }
   };
 
+  // 浮窗拖拽处理
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isFloating) return;
+    setIsDragging(true);
+    const rect = floatingRef.current?.getBoundingClientRect();
+    if (rect) {
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging || !isFloating) return;
+    setPosition({
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
+
+  // 浮窗样式
+  const floatingStyle = isFloating ? {
+    position: 'fixed' as const,
+    top: position.y,
+    left: position.x,
+    zIndex: 1000,
+    width: isMinimized ? '320px' : '400px',
+    maxHeight: isMinimized ? '120px' : '80vh',
+    overflow: 'auto',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+    cursor: isDragging ? 'grabbing' : 'default'
+  } : {};
+
   return (
-    <Card className={`mb-4 border-2 ${getBackgroundColor()} transition-all duration-300`}>
+    <Card 
+      ref={floatingRef}
+      className={`mb-4 border-2 ${getBackgroundColor()} transition-all duration-300 ${isFloating ? 'select-none' : ''}`}
+      style={floatingStyle}
+    >
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex-1">
-            {isEditingTitle ? (
+            {isFloating && (
+              <div 
+                className={`flex items-center gap-2 mb-2 cursor-move ${getTextColor()}`}
+                onMouseDown={handleMouseDown}
+              >
+                <Move className="h-4 w-4" />
+                <span className="text-sm opacity-80">拖拽移动</span>
+              </div>
+            )}
+            
+            {!isMinimized && !isEditingTitle ? (
+              <div 
+                className={`font-semibold ${getTextColor()} cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-2`}
+                onClick={() => !isFloating && setIsEditingTitle(true)}
+              >
+                {currentTitle}
+                {!isFloating && <Edit2 className="h-3 w-3 opacity-50" />}
+              </div>
+            ) : !isMinimized && isEditingTitle ? (
               <div className="flex items-center gap-2">
                 <Input
                   value={editTitle}
@@ -461,148 +544,171 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-            ) : (
-              <div 
-                className={`font-semibold ${getTextColor()} cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-2`}
-                onClick={() => setIsEditingTitle(true)}
-              >
-                {currentTitle}
-                <Edit2 className="h-3 w-3 opacity-50" />
+            ) : null}
+            
+            {!isMinimized && (
+              <div className="flex items-center gap-4 mt-1">
+                {isEditingDuration ? (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${getTextColor()} opacity-80`}>总时长:</span>
+                    <div className="relative">
+                      <Input
+                        ref={durationInputRef}
+                        type="text"
+                        value={editDuration}
+                        onChange={handleDurationInputChange}
+                        onKeyDown={handleDurationKeyPress}
+                        onBlur={handleDurationEdit}
+                        className="w-16 h-6 text-xs bg-white/20 border-white/30 text-center"
+                        placeholder="分钟"
+                      />
+                      {editDuration && (
+                        <button
+                          onClick={clearDurationInput}
+                          className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    <span className={`text-sm ${getTextColor()} opacity-80`}>分钟</span>
+                    <Button size="sm" variant="ghost" onClick={handleDurationEdit} className={getTextColor()}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setIsEditingDuration(false)} className={getTextColor()}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div 
+                    className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
+                    onClick={() => !isFloating && startDurationEdit()}
+                  >
+                    总时长: {formatTime(originalDuration)}
+                    {!isFloating && <Edit2 className="h-3 w-3 opacity-50" />}
+                  </div>
+                )}
+                
+                {isEditingSpeaker ? (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${getTextColor()} opacity-80`}>演讲者:</span>
+                    <Input
+                      value={editSpeaker}
+                      onChange={(e) => setEditSpeaker(e.target.value)}
+                      className="w-24 h-6 text-xs bg-white/20 border-white/30"
+                      onBlur={handleSpeakerEdit}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSpeakerEdit()}
+                      autoFocus
+                    />
+                    <Button size="sm" variant="ghost" onClick={handleSpeakerEdit} className={getTextColor()}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div 
+                    className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
+                    onClick={() => !isFloating && setIsEditingSpeaker(true)}
+                  >
+                    演讲者: {currentSpeaker || '未指定'}
+                    {!isFloating && <Edit2 className="h-3 w-3 opacity-50" />}
+                  </div>
+                )}
               </div>
             )}
-            
-            <div className="flex items-center gap-4 mt-1">
-              {isEditingDuration ? (
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm ${getTextColor()} opacity-80`}>总时长:</span>
-                  <div className="relative">
-                    <Input
-                      ref={durationInputRef}
-                      type="text"
-                      value={editDuration}
-                      onChange={handleDurationInputChange}
-                      onKeyDown={handleDurationKeyPress}
-                      onBlur={handleDurationEdit}
-                      className="w-16 h-6 text-xs bg-white/20 border-white/30 text-center"
-                      placeholder="分钟"
-                    />
-                    {editDuration && (
-                      <button
-                        onClick={clearDurationInput}
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
-                        type="button"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                  <span className={`text-sm ${getTextColor()} opacity-80`}>分钟</span>
-                  <Button size="sm" variant="ghost" onClick={handleDurationEdit} className={getTextColor()}>
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditingDuration(false)} className={getTextColor()}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div 
-                  className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
-                  onClick={startDurationEdit}
-                >
-                  总时长: {formatTime(originalDuration)}
-                  <Edit2 className="h-3 w-3 opacity-50" />
-                </div>
-              )}
-              
-              {isEditingSpeaker ? (
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm ${getTextColor()} opacity-80`}>演讲者:</span>
-                  <Input
-                    value={editSpeaker}
-                    onChange={(e) => setEditSpeaker(e.target.value)}
-                    className="w-24 h-6 text-xs bg-white/20 border-white/30"
-                    onBlur={handleSpeakerEdit}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSpeakerEdit()}
-                    autoFocus
-                  />
-                  <Button size="sm" variant="ghost" onClick={handleSpeakerEdit} className={getTextColor()}>
-                    <Check className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div 
-                  className={`text-sm ${getTextColor()} opacity-80 cursor-pointer hover:bg-white/10 p-1 rounded flex items-center gap-1`}
-                  onClick={() => setIsEditingSpeaker(true)}
-                >
-                  演讲者: {currentSpeaker || '未指定'}
-                  <Edit2 className="h-3 w-3 opacity-50" />
-                </div>
-              )}
-            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
-            ×
-          </Button>
+          
+          <div className="flex items-center gap-1">
+            {isFloating && (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsMinimized(!isMinimized)} 
+                  className={getTextColor()}
+                >
+                  {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsFloating(false)} 
+                  className={getTextColor()}
+                >
+                  <Maximize2 className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+            <Button variant="ghost" size="sm" onClick={onClose} className={getTextColor()}>
+              ×
+            </Button>
+          </div>
         </div>
 
         {/* 当前时间显示 */}
-        <div className="text-center mb-4">
-          <CurrentTime />
-          {agendaItem.scheduledTime && (
-            <div className="mt-2">
-              <Badge variant="outline" className="text-xs flex items-center gap-1 mx-auto w-fit">
-                <Clock className="h-3 w-3" />
-                计划时间: {agendaItem.scheduledTime}
-              </Badge>
-            </div>
-          )}
-        </div>
+        {!isMinimized && (
+          <div className="text-center mb-4">
+            <CurrentTime />
+            {agendaItem.scheduledTime && (
+              <div className="mt-2">
+                <Badge variant="outline" className="text-xs flex items-center gap-1 mx-auto w-fit">
+                  <Clock className="h-3 w-3" />
+                  计划时间: {agendaItem.scheduledTime}
+                </Badge>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 主倒计时显示 */}
         <div className="text-center mb-6">
-          <div className={`text-6xl font-mono font-bold mb-2 ${getTextColor()}`}>
+          <div className={`${isMinimized ? 'text-2xl' : 'text-6xl'} font-mono font-bold mb-2 ${getTextColor()}`}>
             {formatTime(timeRemaining)}
           </div>
-          <Badge className={`text-lg px-4 py-2 ${
-            phase === 'white' ? 'bg-white text-black border-2 border-black' :
-            phase === 'red' ? 'bg-red-600 text-white' :
-            phase === 'yellow' ? 'bg-yellow-600 text-white' :
-            phase === 'green' ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'
-          }`}>
-            <Volume2 className="h-4 w-4 mr-2" />
-            {getPhaseText()}
-          </Badge>
+          {!isMinimized && (
+            <Badge className={`text-lg px-4 py-2 ${
+              phase === 'white' ? 'bg-white text-black border-2 border-black' :
+              phase === 'red' ? 'bg-red-600 text-white' :
+              phase === 'yellow' ? 'bg-yellow-600 text-white' :
+              phase === 'green' ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'
+            }`}>
+              <Volume2 className="h-4 w-4 mr-2" />
+              {getPhaseText()}
+            </Badge>
+          )}
         </div>
 
         {/* 主控制按钮 */}
-        <div className="flex justify-center space-x-3 mb-6">
+        <div className={`flex justify-center space-x-${isMinimized ? '1' : '3'} mb-6`}>
           {!isRunning && (
-            <Button onClick={handleStart} className="bg-green-600 hover:bg-green-700">
-              <Play className="h-4 w-4 mr-2" />
-              {hasStarted ? '继续' : '开始'}
+            <Button onClick={handleStart} className="bg-green-600 hover:bg-green-700" size={isMinimized ? "sm" : "default"}>
+              <Play className="h-4 w-4 mr-1" />
+              {isMinimized ? '' : (hasStarted ? '继续' : '开始')}
             </Button>
           )}
           
           {isRunning && (
             <>
-              <Button onClick={handlePause} variant="outline">
-                <Pause className="h-4 w-4 mr-2" />
-                暂停
+              <Button onClick={handlePause} variant="outline" size={isMinimized ? "sm" : "default"}>
+                <Pause className="h-4 w-4 mr-1" />
+                {isMinimized ? '' : '暂停'}
               </Button>
-              <Button onClick={handleStop} variant="destructive">
-                结束计时
+              <Button onClick={handleStop} variant="destructive" size={isMinimized ? "sm" : "default"}>
+                {isMinimized ? '结束' : '结束计时'}
               </Button>
             </>
           )}
           
-          <Button onClick={handleReset} variant="outline">
-            <RotateCcw className="h-4 w-4 mr-2" />
-            重置
-          </Button>
+          {!isMinimized && (
+            <Button onClick={handleReset} variant="outline">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              重置
+            </Button>
+          )}
         </div>
 
         {/* 即兴演讲个人计时器 */}
-        {isTableTopics && (
+        {isTableTopics && !isMinimized && (
           <div className="border-t pt-4 mb-4">
             <div className="flex items-center justify-between mb-3">
               <Label className={getTextColor()}>个人计时器</Label>
@@ -660,6 +766,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         )}
 
         {/* 规则配置 */}
+        {!isMinimized && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-3">
             <Label className={getTextColor()}>计时规则配置</Label>
@@ -721,6 +828,7 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
             </div>
           )}
         </div>
+        )}
       </CardContent>
     </Card>
   );
