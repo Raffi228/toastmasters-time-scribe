@@ -196,6 +196,14 @@ const AgendaList: React.FC<AgendaListProps> = ({
                         <Edit2 className="h-3 w-3 opacity-50" />
                       </span>
                     )}
+
+                    {/* Scheduled Time Display */}
+                    {item.scheduledTime && (
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {item.scheduledTime}
+                      </Badge>
+                    )}
                   </div>
                   
                   <div className="flex items-center space-x-2">

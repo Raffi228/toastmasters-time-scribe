@@ -2,7 +2,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, TrendingUp, TrendingDown, Target } from 'lucide-react';
+import { Clock, Target, BarChart3 } from 'lucide-react';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 
 interface TimerReportProps {
   agenda: Array<{
@@ -86,6 +88,25 @@ const TimerReport: React.FC<TimerReportProps> = ({ agenda, timerRecords }) => {
   const analysis = getTimeAnalysis();
   const structureAnalysis = getStructureAnalysis();
 
+  // 图表数据
+  const chartData = structureAnalysis.map(item => ({
+    name: item.speaker || item.title.substring(0, 8) + '...',
+    实际用时: Math.round(item.record.actualDuration / 60 * 10) / 10,
+    计划用时: Math.round(item.duration / 60 * 10) / 10,
+    usage: item.usage
+  }));
+
+  const chartConfig = {
+    实际用时: {
+      label: "实际用时 (分钟)",
+      color: "hsl(var(--chart-1))",
+    },
+    计划用时: {
+      label: "计划用时 (分钟)", 
+      color: "hsl(var(--chart-2))",
+    },
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -113,57 +134,36 @@ const TimerReport: React.FC<TimerReportProps> = ({ agenda, timerRecords }) => {
           </div>
         </div>
 
-        {/* 演讲用时结构分析 */}
+        {/* 用时情况统计图表 */}
         <div>
           <h4 className="font-semibold mb-3 flex items-center">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            演讲用时结构分析
+            <BarChart3 className="h-4 w-4 mr-2" />
+            用时情况统计图表
           </h4>
-          <div className="space-y-3">
-            {structureAnalysis.map((item, index) => (
-              <div key={item.id} className="border rounded-lg p-3 bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{item.title}</span>
-                    {item.speaker && <Badge variant="secondary">{item.speaker}</Badge>}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {formatTime(item.record.actualDuration)} / {formatTime(item.duration)}
-                  </div>
-                </div>
-                <div className="text-sm space-y-1">
-                  <div className="flex items-center">
-                    <span className="text-gray-600 mr-2">分析:</span>
-                    <Badge variant={
-                      item.usage < 0.8 ? "secondary" : 
-                      item.record.isOvertime ? "destructive" : "default"
-                    }>
-                      {item.analysis}
-                    </Badge>
-                  </div>
-                  <div className="text-gray-600">
-                    <span className="mr-2">建议:</span>
-                    {item.suggestion}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 演讲用时建议 */}
-        <div>
-          <h4 className="font-semibold mb-3 flex items-center">
-            <TrendingDown className="h-4 w-4 mr-2" />
-            演讲用时建议
-          </h4>
-          <div className="text-sm text-gray-700 space-y-2">
-            <p>• 开头部分建议占用时的10%，用于抓住听众注意力</p>
-            <p>• 主体部分建议占用时的75%，内容分配要均匀</p>
-            <p>• 结尾部分建议占用时的10-15%，要有力总结</p>
-            <p>• 可以通过练习测量语速，使用计时工具提升时间感知能力</p>
-            <p>• 建议多担任时间官角色，增强对时间的敏感度</p>
-          </div>
+          {chartData.length > 0 ? (
+            <ChartContainer config={chartConfig} className="h-[300px]">
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="计划用时" fill="var(--color-计划用时)" />
+                <Bar dataKey="实际用时" fill="var(--color-实际用时)">
+                  {chartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.usage > 1.1 ? "hsl(var(--destructive))" : 
+                            entry.usage < 0.8 ? "hsl(var(--muted-foreground))" : 
+                            "var(--color-实际用时)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>暂无计时数据</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
