@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X, Clock } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
 import CurrentTime from '@/components/CurrentTime';
 
@@ -16,10 +16,11 @@ interface AdvancedTimerProps {
     duration: number;
     type: 'speech' | 'evaluation' | 'table-topics' | 'break';
     speaker?: string;
+    scheduledTime?: string;
   };
   onComplete: (data: { actualDuration: number; isOvertime: boolean; overtimeAmount: number }) => void;
   onClose: () => void;
-  onUpdate?: (updatedItem: { id: string; title: string; duration: number; speaker?: string; type: 'speech' | 'evaluation' | 'table-topics' | 'break' }) => void;
+  onUpdate?: (updatedItem: { id: string; title: string; duration: number; speaker?: string; type: 'speech' | 'evaluation' | 'table-topics' | 'break'; scheduledTime?: string }) => void;
 }
 
 interface PersonalTimer {
@@ -547,6 +548,14 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
         {/* 当前时间显示 */}
         <div className="text-center mb-4">
           <CurrentTime />
+          {agendaItem.scheduledTime && (
+            <div className="mt-2">
+              <Badge variant="outline" className="text-xs flex items-center gap-1 mx-auto w-fit">
+                <Clock className="h-3 w-3" />
+                计划时间: {agendaItem.scheduledTime}
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* 主倒计时显示 */}
