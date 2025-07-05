@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X, Clock, Minimize2, Maximize2, Move } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Settings, Plus, Trash2, Edit2, Check, X, Clock, Minimize2, Maximize2, Move, ExternalLink, X as CloseIcon } from 'lucide-react';
 import { PRESET_RULES, getTypeFromTitle, type AgendaType, type TimerRules, type TimerConfig } from '@/types/timer';
 import CurrentTime from '@/components/CurrentTime';
 
@@ -75,6 +75,8 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [floatingSize, setFloatingSize] = useState({ width: 400, height: 600 });
+  const [isResizing, setIsResizing] = useState(false);
   
   // 即兴演讲个人计时器
   const [isTableTopics, setIsTableTopics] = useState(false);
@@ -234,10 +236,6 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
   const handleStart = () => {
     setIsRunning(true);
     setHasStarted(true);
-    // 开始计时时自动切换到浮窗模式
-    if (!isFloating) {
-      setIsFloating(true);
-    }
   };
 
   const handlePause = () => {
@@ -493,11 +491,15 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
     top: position.y,
     left: position.x,
     zIndex: 1000,
-    width: isMinimized ? '320px' : '400px',
-    maxHeight: isMinimized ? '120px' : '80vh',
+    width: isMinimized ? '320px' : `${floatingSize.width}px`,
+    height: isMinimized ? '120px' : `${floatingSize.height}px`,
+    maxHeight: isMinimized ? '120px' : '90vh',
     overflow: 'auto',
     boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-    cursor: isDragging ? 'grabbing' : 'default'
+    cursor: isDragging ? 'grabbing' : 'default',
+    resize: (isMinimized ? 'none' : 'both') as React.CSSProperties['resize'],
+    minWidth: '300px',
+    minHeight: '200px'
   } : {};
 
   return (
@@ -634,8 +636,9 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
                   size="sm" 
                   onClick={() => setIsFloating(false)} 
                   className={getTextColor()}
+                  title="取消浮窗"
                 >
-                  <Maximize2 className="h-3 w-3" />
+                  <CloseIcon className="h-3 w-3" />
                 </Button>
               </>
             )}
@@ -700,10 +703,18 @@ const AdvancedTimer: React.FC<AdvancedTimerProps> = ({ agendaItem, onComplete, o
           )}
           
           {!isMinimized && (
-            <Button onClick={handleReset} variant="outline">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              重置
-            </Button>
+            <>
+              <Button onClick={handleReset} variant="outline">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                重置
+              </Button>
+              {!isFloating && (
+                <Button onClick={() => setIsFloating(true)} variant="outline">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  浮窗模式
+                </Button>
+              )}
+            </>
           )}
         </div>
 
