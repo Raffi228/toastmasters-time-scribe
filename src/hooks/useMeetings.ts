@@ -1,7 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
+// 数据类型定义
 export interface Meeting {
   id: string;
   title: string;
@@ -21,16 +23,6 @@ export interface AgendaItem {
   actualStartTime?: string;
   actualEndTime?: string;
   orderIndex: number;
-}
-
-export interface TimerRecord {
-  id: string;
-  agendaItemId: string;
-  actualDuration: number;
-  isOvertime: boolean;
-  overtimeAmount: number;
-  startedAt: string;
-  endedAt: string;
 }
 
 export const useMeetings = () => {
@@ -196,8 +188,26 @@ export const useMeetings = () => {
     }
   };
 
+  // 添加实时监听
   useEffect(() => {
     fetchMeetings();
+
+    // 设置实时监听
+    const meetingsChannel = supabase
+      .channel('meetings-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'meetings' },
+        () => fetchMeetings()
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'agenda_items' },
+        () => fetchMeetings()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(meetingsChannel);
+    };
   }, []);
 
   return {
