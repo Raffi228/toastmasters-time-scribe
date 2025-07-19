@@ -14,12 +14,14 @@ interface ImportAgendaDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (agenda: Array<Omit<ParsedAgendaItem, 'id'>>) => void;
+  onQuickStart?: (agenda: Array<Omit<ParsedAgendaItem, 'id'>>) => void; // 新增：快速开始回调
 }
 
 const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
   isOpen,
   onClose,
-  onImport
+  onImport,
+  onQuickStart
 }) => {
   const { t } = useLanguage();
   const [inputText, setInputText] = useState('');
@@ -78,6 +80,17 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
     console.log('开始导入:', parsedItems.length, '项');
     if (parsedItems.length > 0) {
       onImport(parsedItems);
+      onClose();
+      setInputText('');
+      setParsedItems([]);
+      setErrors([]);
+    }
+  };
+
+  const handleQuickStart = () => {
+    console.log('快速开始计时:', parsedItems.length, '项');
+    if (parsedItems.length > 0 && onQuickStart) {
+      onQuickStart(parsedItems);
       onClose();
       setInputText('');
       setParsedItems([]);
@@ -312,6 +325,15 @@ const ImportAgendaDialog: React.FC<ImportAgendaDialogProps> = ({
               <Button variant="outline" onClick={handleClose} className="px-6">
                 {t('button.cancel') || '取消'}
               </Button>
+              {canImport && onQuickStart && (
+                <Button 
+                  onClick={handleQuickStart}
+                  variant="outline"
+                  className="px-6 border-orange-500 text-orange-600 hover:bg-orange-50"
+                >
+                  直接开始计时
+                </Button>
+              )}
               <Button 
                 onClick={handleImport}
                 disabled={!canImport}

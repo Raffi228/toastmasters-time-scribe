@@ -28,12 +28,14 @@ interface CreateMeetingDialogProps {
     time: string;
     agenda: AgendaItem[];
   }) => void;
+  onQuickStart?: (agenda: AgendaItem[]) => void; // 新增：快速开始回调
 }
 
 const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
   isOpen,
   onClose,
   onCreateMeeting,
+  onQuickStart,
 }) => {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -174,6 +176,33 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
     });
     
     // 提交后会自动关闭对话框，状态会在下次打开时重置
+    onClose();
+  };
+
+  const handleQuickStart = () => {
+    if (agenda.length === 0) return;
+    
+    // 快速开始计时，使用当前日期和时间
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().slice(0, 5);
+    
+    // 生成默认会议名称
+    const defaultTitle = `即时会议 ${now.toLocaleDateString()} ${timeStr}`;
+    
+    // 调用创建会议回调，使用默认信息
+    onCreateMeeting({
+      title: defaultTitle,
+      date: dateStr,
+      time: timeStr,
+      agenda,
+    });
+    
+    // 如果提供了快速开始回调，则调用
+    if (onQuickStart) {
+      onQuickStart(agenda);
+    }
+    
     onClose();
   };
 
@@ -505,11 +534,23 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
             )}
 
             {/* Actions */}
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={onClose}>
                 取消
               </Button>
-              <Button onClick={handleSubmit} disabled={!title || !date || !time}>
+              {agenda.length > 0 && (
+                <Button 
+                  onClick={handleQuickStart}
+                  variant="outline"
+                  className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                >
+                  直接开始计时
+                </Button>
+              )}
+              <Button 
+                onClick={handleSubmit}
+                disabled={!title || !date || !time || agenda.length === 0}
+              >
                 创建会议
               </Button>
             </div>
@@ -521,6 +562,30 @@ const CreateMeetingDialog: React.FC<CreateMeetingDialogProps> = ({
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
         onImport={handleImport}
+        onQuickStart={(importedAgenda) => {
+          // 将导入的议程转换为AgendaItem格式
+          const agendaWithIds = importedAgenda.map(item => ({
+            ...item,
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          }));
+          
+          // 快速开始计时，直接调用快速开始处理函数
+          const now = new Date();
+          const dateStr = now.toISOString().split('T')[0];
+          const timeStr = now.toTimeString().slice(0, 5);
+          const defaultTitle = `即时会议 ${now.toLocaleDateString()} ${timeStr}`;
+          
+          onCreateMeeting({
+            title: defaultTitle,
+            date: dateStr,
+            time: timeStr,
+            agenda: agendaWithIds,
+          });
+          
+          if (onQuickStart) {
+            onQuickStart(agendaWithIds);
+          }
+        }}
       />
     </>
   );

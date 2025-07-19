@@ -25,12 +25,36 @@ const Index = () => {
     agenda: any[];
   }) => {
     try {
-      await createMeeting(meetingData);
+      const meetingId = await createMeeting(meetingData);
       setIsCreateDialogOpen(false);
+      
+      // 如果成功创建，可以自动跳转到会议
+      if (meetingId && meetings.length > 0) {
+        // 找到刚创建的会议（最后一个）
+        setTimeout(() => {
+          const latestMeeting = meetings[meetings.length - 1];
+          if (latestMeeting) {
+            handleEnterMeeting(latestMeeting);
+          }
+        }, 500);
+      }
     } catch (error) {
       console.error('创建会议失败:', error);
       // 可以添加错误提示
     }
+  };
+
+  const handleQuickStart = async (agenda: any[]) => {
+    // 快速开始时直接跳转到会议页面
+    // 等待数据库更新后再跳转
+    setTimeout(() => {
+      if (meetings.length > 0) {
+        const latestMeeting = meetings[meetings.length - 1];
+        if (latestMeeting) {
+          handleEnterMeeting(latestMeeting);
+        }
+      }
+    }, 1000);
   };
 
   const handleEnterMeeting = (meeting: any) => {
@@ -214,11 +238,12 @@ const Index = () => {
         </div>
       </main>
 
-      <CreateMeetingDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        onCreateMeeting={handleCreateMeeting}
-      />
+          <CreateMeetingDialog
+            isOpen={isCreateDialogOpen}
+            onClose={() => setIsCreateDialogOpen(false)}
+            onCreateMeeting={handleCreateMeeting}
+            onQuickStart={handleQuickStart}
+          />
     </div>
   );
 };
