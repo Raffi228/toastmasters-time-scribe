@@ -67,6 +67,39 @@ export type Database = {
           },
         ]
       }
+      filler_word_records: {
+        Row: {
+          agenda_item_id: string
+          created_at: string
+          filler_words: Json
+          id: string
+          notes: string | null
+          speaker: string
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          agenda_item_id: string
+          created_at?: string
+          filler_words?: Json
+          id?: string
+          notes?: string | null
+          speaker: string
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          agenda_item_id?: string
+          created_at?: string
+          filler_words?: Json
+          id?: string
+          notes?: string | null
+          speaker?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           created_at: string

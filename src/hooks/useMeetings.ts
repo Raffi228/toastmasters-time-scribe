@@ -188,6 +188,32 @@ export const useMeetings = () => {
     }
   };
 
+  const saveFillerWordRecord = async (agendaItemId: string, record: {
+    speaker: string;
+    fillerWords: Record<string, number>;
+    totalCount: number;
+    notes: string;
+  }) => {
+    try {
+      const { error } = await supabase
+        .from('filler_word_records')
+        .upsert({
+          agenda_item_id: agendaItemId,
+          speaker: record.speaker,
+          filler_words: record.fillerWords,
+          total_count: record.totalCount,
+          notes: record.notes
+        }, {
+          onConflict: 'agenda_item_id'
+        });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('保存哼哈词记录出错:', err);
+      throw err;
+    }
+  };
+
   // 添加实时监听
   useEffect(() => {
     fetchMeetings();
@@ -217,6 +243,7 @@ export const useMeetings = () => {
     createMeeting,
     updateMeetingStatus,
     recordTimer,
+    saveFillerWordRecord,
     refetch: fetchMeetings
   };
 };

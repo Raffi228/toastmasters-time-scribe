@@ -8,8 +8,10 @@ import AgendaList from '@/components/meeting/AgendaList';
 import MeetingSummary from '@/components/meeting/MeetingSummary';
 import FillerWordTracker from '@/components/meeting/FillerWordTracker';
 import TimeEditor from '@/components/timer/TimeEditor';
+import FillerWordHeatmap from '@/components/reports/FillerWordHeatmap';
 import { useMeetings } from '@/hooks/useMeetings';
 import { toast } from 'sonner';
+import { Volume2 } from 'lucide-react';
 
 interface Meeting {
   id: string;
@@ -33,8 +35,8 @@ interface MeetingDashboardProps {
 }
 
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
-  const { recordTimer } = useMeetings();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation' | 'filler-tracker'>('dashboard');
+  const { recordTimer, saveFillerWordRecord } = useMeetings();
+  const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation' | 'filler-tracker' | 'heatmap'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -198,11 +200,26 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
     setCurrentView('dashboard');
   };
 
-  const handleFillerWordSave = (record: any) => {
+  const handleFillerWordSave = async (record: any) => {
     setFillerWordRecords(prev => ({
       ...prev,
       [selectedAgenda!]: record
     }));
+    
+    // 保存到数据库
+    try {
+      await saveFillerWordRecord(selectedAgenda!, {
+        speaker: record.speaker,
+        fillerWords: record.fillerWords,
+        totalCount: record.totalCount,
+        notes: record.notes
+      });
+      toast.success('哼哈词记录已保存');
+    } catch (error) {
+      console.error('保存哼哈词记录失败:', error);
+      toast.error('保存哼哈词记录失败，但数据已在本地保存');
+    }
+    
     setCurrentView('dashboard');
   };
 
@@ -410,6 +427,33 @@ ${item.fillerWords ? `
     );
   }
 
+  // 哼哈词热力图视图
+  if (currentView === 'heatmap') {
+    const heatmapData = Object.entries(fillerWordRecords).map(([agendaId, record]) => {
+      const agendaItem = meetingData.agenda.find(item => item.id === agendaId);
+      return {
+        speaker: record.speaker || agendaItem?.speaker || '未知',
+        fillerWords: record.fillerWords || {},
+        totalCount: record.totalCount || 0,
+        agendaTitle: agendaItem?.title || '未知环节'
+      };
+    });
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
+        <MeetingHeader
+          meeting={meetingData}
+          onBack={() => setCurrentView('dashboard')}
+          onImport={() => setIsImportDialogOpen(true)}
+          onExport={exportReport}
+        />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <FillerWordHeatmap data={heatmapData} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
       <MeetingHeader
@@ -511,6 +555,18 @@ ${item.fillerWords ? `
               onImportAgenda={() => setIsImportDialogOpen(true)}
               onExportReport={exportReport}
             />
+            {/* 哼哈词热力图按钮 */}
+            {Object.keys(fillerWordRecords).length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setCurrentView('heatmap')}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <Volume2 className="h-4 w-4" />
+                  查看哼哈词热力图
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>
