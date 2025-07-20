@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EvaluationForm from '@/components/EvaluationForm';
 import ImportAgendaDialog from '@/components/ImportAgendaDialog';
 import AddAgendaDialog from '@/components/AddAgendaDialog';
@@ -8,6 +8,8 @@ import AgendaList from '@/components/meeting/AgendaList';
 import MeetingSummary from '@/components/meeting/MeetingSummary';
 import FillerWordTracker from '@/components/meeting/FillerWordTracker';
 import TimeEditor from '@/components/timer/TimeEditor';
+import { useMeetings } from '@/hooks/useMeetings';
+import { toast } from 'sonner';
 
 interface Meeting {
   id: string;
@@ -31,6 +33,7 @@ interface MeetingDashboardProps {
 }
 
 const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) => {
+  const { recordTimer } = useMeetings();
   const [currentView, setCurrentView] = useState<'dashboard' | 'evaluation' | 'filler-tracker'>('dashboard');
   const [selectedAgenda, setSelectedAgenda] = useState<string | null>(null);
   const [activeTimers, setActiveTimers] = useState<Set<string>>(new Set());
@@ -40,6 +43,50 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
   const [evaluations, setEvaluations] = useState<Record<string, { content: string; strengths: string[]; improvements: string[]; }>>({});
   const [fillerWordRecords, setFillerWordRecords] = useState<Record<string, any>>({});
   const [meetingData, setMeetingData] = useState(meeting);
+  
+  // 在组件加载时从localStorage恢复状态
+  useEffect(() => {
+    const savedTimerRecords = localStorage.getItem(`timerRecords-${meeting.id}`);
+    const savedEvaluations = localStorage.getItem(`evaluations-${meeting.id}`);
+    const savedFillerWords = localStorage.getItem(`fillerWords-${meeting.id}`);
+    
+    if (savedTimerRecords) {
+      try {
+        setTimerRecords(JSON.parse(savedTimerRecords));
+      } catch (error) {
+        console.error('恢复计时记录失败:', error);
+      }
+    }
+    
+    if (savedEvaluations) {
+      try {
+        setEvaluations(JSON.parse(savedEvaluations));
+      } catch (error) {
+        console.error('恢复点评记录失败:', error);
+      }
+    }
+    
+    if (savedFillerWords) {
+      try {
+        setFillerWordRecords(JSON.parse(savedFillerWords));
+      } catch (error) {
+        console.error('恢复哼哈词记录失败:', error);
+      }
+    }
+  }, [meeting.id]);
+  
+  // 保存状态到localStorage
+  useEffect(() => {
+    localStorage.setItem(`timerRecords-${meeting.id}`, JSON.stringify(timerRecords));
+  }, [timerRecords, meeting.id]);
+  
+  useEffect(() => {
+    localStorage.setItem(`evaluations-${meeting.id}`, JSON.stringify(evaluations));
+  }, [evaluations, meeting.id]);
+  
+  useEffect(() => {
+    localStorage.setItem(`fillerWords-${meeting.id}`, JSON.stringify(fillerWordRecords));
+  }, [fillerWordRecords, meeting.id]);
   
   // 编辑状态
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -111,6 +158,28 @@ const MeetingDashboard: React.FC<MeetingDashboardProps> = ({ meeting, onBack }) 
       newSet.delete(agendaId);
       return newSet;
     });
+    
+    // 保存计时记录到数据库
+    const saveTimerRecord = async () => {
+      try {
+        const now = new Date().toISOString();
+        const startedAt = new Date(Date.now() - data.actualDuration * 1000).toISOString();
+        
+        await recordTimer(agendaId, {
+          actualDuration: data.actualDuration,
+          isOvertime: data.isOvertime,
+          overtimeAmount: data.overtimeAmount,
+          startedAt,
+          endedAt: now,
+        });
+        
+        toast.success('计时记录已保存');
+      } catch (error) {
+        console.error('保存计时记录失败:', error);
+        toast.error('保存计时记录失败，但数据已在本地保存');
+      }
+    };
+    saveTimerRecord();
   };
 
   const handleTimerClose = (agendaId: string) => {

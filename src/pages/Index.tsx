@@ -82,12 +82,10 @@ const Index = () => {
     switch (status) {
       case 'active':
         return '进行中';
-      case 'upcoming':
-        return '即将开始';
       case 'completed':
         return '已结束';
       default:
-        return '未知';
+        return '';
     }
   };
 
